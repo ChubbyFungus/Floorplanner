@@ -326,11 +326,17 @@ export const FloorPlanner2D: React.FC = () => {
     } else if (selectedTool === 'room') {
       console.log(`Selected tool: ${selectedTool} (Room tool)`);
       if (!roomStart) {
-        setRoomStart(point);
+        // For the first click, try to snap to existing walls
+        const nearestPoint = findNearestWallPoint(point, walls);
+        setRoomStart(nearestPoint || point);
       } else {
-        // Create rectangular room
-        const width = Math.abs(point.x - roomStart.x);
-        const depth = Math.abs(point.y - roomStart.y);
+        // For the second click, apply snapping
+        const nearestPoint = findNearestWallPoint(point, walls);
+        const endPoint = nearestPoint || point;
+        
+        // Create rectangular room using snapped coordinates
+        const width = Math.abs(endPoint.x - roomStart.x);
+        const depth = Math.abs(endPoint.y - roomStart.y);
         
         // Convert dimensions to feet for display
         const widthInFeet = width / PIXELS_PER_FOOT;
@@ -338,8 +344,8 @@ export const FloorPlanner2D: React.FC = () => {
         console.log(`Room dimensions: ${widthInFeet.toFixed(2)}' x ${depthInFeet.toFixed(2)}'`);
         
         void dispatch(createRectangularRoom({
-          startX: Math.min(roomStart.x, point.x),
-          startY: Math.min(roomStart.y, point.y),
+          startX: Math.min(roomStart.x, endPoint.x),
+          startY: Math.min(roomStart.y, endPoint.y),
           width,
           depth,
           thickness: 10,
