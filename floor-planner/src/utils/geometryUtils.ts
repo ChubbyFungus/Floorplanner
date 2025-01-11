@@ -494,3 +494,11 @@ export function shouldShowWallMeasurement(wall: WallData, walls: WallData[]): bo
   
   return parallelWalls.length === 0;
 }
+
+// Helper function to check if a point is connected to an existing wall
+export function isConnectedToExistingWall(point: Point2D, walls: WallData[]): boolean {
+  return walls.some(wall => 
+    arePointsEqual(wall.start, point) || 
+    arePointsEqual(wall.end, point)
+  );
+}
