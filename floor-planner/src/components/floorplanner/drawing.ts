@@ -377,31 +377,43 @@ function arePointsEqual(p1: Point2D, p2: Point2D): boolean {
 
 // Helper function to check if a wall is part of a room boundary
 function isRoomBoundaryWall(wall: WallData, walls: WallData[]): boolean {
-  let parallelCount = 0;
-  let perpendicularCount = 0;
-  
-  for (const otherWall of walls) {
-    if (wall === otherWall) continue;
+  // For now, consider any wall that has perpendicular connections at both ends as a boundary
+  const connectedWalls = walls.filter(w => {
+    if (w === wall) return false;
     
-    const angle = getWallAngle(wall, otherWall);
-    if (angle < 0.1) { // Parallel
-      const dist = getParallelWallDistance(wall, otherWall);
-      if (dist < 200) parallelCount++;
-    } else if (Math.abs(angle - Math.PI/2) < 0.1) { // Perpendicular
-      perpendicularCount++;
-    }
-  }
+    // Check if wall connects at either end
+    const connectsAtStart = arePointsEqual(w.start, wall.start) || arePointsEqual(w.end, wall.start);
+    const connectsAtEnd = arePointsEqual(w.start, wall.end) || arePointsEqual(w.end, wall.end);
+    
+    if (!connectsAtStart && !connectsAtEnd) return false;
+    
+    // Check if it's roughly perpendicular
+    const angle = getWallAngle(wall, w);
+    return Math.abs(angle - Math.PI/2) < 0.1;
+  });
   
-  return parallelCount >= 1 && perpendicularCount >= 2;
+  // Count perpendicular connections at each end
+  const startConnections = connectedWalls.filter(w => 
+    arePointsEqual(w.start, wall.start) || arePointsEqual(w.end, wall.start)
+  ).length;
+  
+  const endConnections = connectedWalls.filter(w => 
+    arePointsEqual(w.start, wall.end) || arePointsEqual(w.end, wall.end)
+  ).length;
+  
+  // It's a boundary wall if it has at least one perpendicular connection
+  return startConnections > 0 || endConnections > 0;
 }
 
 // Helper function to determine if a wall should show measurements
 function shouldShowWallMeasurement(wall: WallData, walls: WallData[]): boolean {
-  // Always show measurements for main room boundary walls
+  // For simple rectangles, always show measurements
+  if (walls.length <= 4) return true;
+  
+  // For more complex layouts, use boundary detection
   if (isRoomBoundaryWall(wall, walls)) {
-    // Skip small walls (like doorways or small segments)
     const length = getDistance(wall.start, wall.end);
-    if (length < 60) return false; // Skip walls shorter than 5 feet (60 inches)
+    if (length < 36) return false; // Skip very small walls (less than 3 feet)
     
     // Skip walls that are part of a larger aligned wall
     for (const otherWall of walls) {
@@ -423,20 +435,7 @@ function shouldShowWallMeasurement(wall: WallData, walls: WallData[]): boolean {
     return true;
   }
   
-  // For non-boundary walls, only show if they're significant
-  const length = getDistance(wall.start, wall.end);
-  if (length < 60) return false; // Skip walls shorter than 5 feet
-  
-  // Show measurements for standalone walls
-  const connectedWalls = walls.filter(w => {
-    if (w === wall) return false;
-    return arePointsEqual(w.start, wall.start) || 
-           arePointsEqual(w.start, wall.end) ||
-           arePointsEqual(w.end, wall.start) ||
-           arePointsEqual(w.end, wall.end);
-  });
-  
-  return connectedWalls.length === 0;
+  return false; // Don't show measurements for non-boundary walls
 }
 
 // Helper function to check if a wall intersection should split the measurement
