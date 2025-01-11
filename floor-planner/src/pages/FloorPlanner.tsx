@@ -56,9 +56,12 @@ export const FloorPlanner: React.FC = () => {
   };
 
   const handleToolSelect = (tool: string) => {
+    console.log('Tool selected:', { currentTool: selectedTool, newTool: tool });
     if (selectedTool === tool) {
+      console.log('Deselecting tool');
       dispatch(setSelectedTool(null));
     } else {
+      console.log('Setting new tool');
       dispatch(setSelectedTool(tool));
     }
   };
@@ -104,19 +107,19 @@ export const FloorPlanner: React.FC = () => {
 
       <Box mb={2} display="flex" gap={2}>
         <Button
-          variant={selectedTool === "wall" ? "outlined" : "contained"}
+          variant={selectedTool === "wall" ? "contained" : "outlined"}
           onClick={() => handleToolSelect("wall")}
         >
           Wall Tool
         </Button>
         <Button
-          variant={selectedTool === "fixture" ? "outlined" : "contained"}
+          variant={selectedTool === "fixture" ? "contained" : "outlined"}
           onClick={() => handleToolSelect("fixture")}
         >
           Fixture Tool
         </Button>
         <Button
-          variant={selectedTool === "room" ? "outlined" : "contained"}
+          variant={selectedTool === "room" ? "contained" : "outlined"}
           onClick={() => handleToolSelect("room")}
         >
           Room Tool

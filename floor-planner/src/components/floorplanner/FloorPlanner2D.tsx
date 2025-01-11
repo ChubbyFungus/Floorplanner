@@ -196,14 +196,17 @@ export const FloorPlanner2D: React.FC = () => {
     if (!canvasRef.current) return;
 
     const point = getMousePosition(e);
+    console.log('Canvas clicked:', { point, selectedTool, wallInProgress });
 
     if (selectedTool === 'wall') {
+      console.log('Wall tool active');
       if (wallInProgress) {
+        console.log('Wall in progress');
         if (isAltPressed) {
-          // Add control point when Alt is pressed
+          console.log('Alt pressed, adding control point');
           dispatch(addWallControlPoint(point));
         } else {
-          // Complete current wall section with angle snapping
+          console.log('Creating wall section');
           const snappedPoint = snapAngle(wallInProgress.start, point);
           const newWall = {
             id: uuidv4(),
@@ -214,22 +217,29 @@ export const FloorPlanner2D: React.FC = () => {
             height: 280
           };
 
+          console.log('New wall:', newWall);
+          console.log('Existing walls:', walls);
+
           // Check if this wall would complete a shape
           if (wouldCompleteShape(newWall, walls)) {
-            // Add the final wall and end wall drawing
+            console.log('Completing shape');
             dispatch(addWall(newWall));
             dispatch(finalizeWall());
           } else {
-            // Add the wall and start a new one from the end point
+            console.log('Starting new wall section');
             dispatch(addWall(newWall));
             dispatch(startWall(snappedPoint));
           }
         }
       } else {
+        console.log('Starting new wall', { point, walls });
         // Only start a new wall if clicking near an existing wall endpoint
         // or if there are no walls yet
         if (walls.length === 0 || isConnectedToExistingWall(point, walls)) {
+          console.log('Dispatching startWall');
           dispatch(startWall(point));
+        } else {
+          console.log('Point not connected to existing wall');
         }
       }
     } else if (selectedTool === 'room') {
