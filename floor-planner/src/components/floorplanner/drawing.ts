@@ -1,125 +1,58 @@
 // drawing.ts
 import { WallData, Point2D } from "../../types";
-import { pixelsToFeetAndInches } from "../../utils/geometryUtils";
-
-const POINT_TOLERANCE = 1e-6;
+import { 
+  pixelsToFeetAndInches,
+  calculateAreaAndVolume,
+  POINT_TOLERANCE,
+  shouldShowWallMeasurement,
+  getDistance,
+  getParallelWallDistance,
+  isRoomBoundaryWall,
+  normalizeParallelMeasurements,
+  findWallIntersections
+} from "../../utils/geometryUtils";
 
 // Helper function to draw wall measurement
-function drawWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, offset: number = 20, length?: number, walls: WallData[]) {
-  const dx = wall.end.x - wall.start.x;
-  const dy = wall.end.y - wall.start.y;
-  const actualLength = length || getInteriorWallLength(wall);
-  const angle = Math.atan2(dy, dx);
-  
-  // Calculate wall direction unit vector
-  const wallLength = Math.sqrt(dx * dx + dy * dy);
-  const dirX = dx / wallLength;
-  const dirY = dy / wallLength;
-  
-  // Adjust start and end points to account for wall thickness
-  const halfThickness = wall.thickness / 2;
-  const adjustedStart = {
-    x: wall.start.x + dirX * halfThickness,
-    y: wall.start.y + dirY * halfThickness
-  };
-  const adjustedEnd = {
-    x: wall.end.x - dirX * halfThickness,
-    y: wall.end.y - dirY * halfThickness
-  };
-  
-  // Determine which side to show measurement based on wall position
-  const measurementSide = getMeasurementSide(wall, walls);
-  
-  // Calculate measurement line positions with adjusted offset
-  const offsetX = Math.sin(angle) * offset * measurementSide;
-  const offsetY = -Math.cos(angle) * offset * measurementSide;
-  
-  const startOffsetX = adjustedStart.x + offsetX;
-  const startOffsetY = adjustedStart.y + offsetY;
-  const endOffsetX = adjustedEnd.x + offsetX;
-  const endOffsetY = adjustedEnd.y + offsetY;
-  
-  // Draw extension lines
-  ctx.beginPath();
-  ctx.moveTo(adjustedStart.x, adjustedStart.y);
-  ctx.lineTo(startOffsetX, startOffsetY);
-  ctx.moveTo(adjustedEnd.x, adjustedEnd.y);
-  ctx.lineTo(endOffsetX, endOffsetY);
-  ctx.strokeStyle = '#666666';
-  ctx.lineWidth = 0.5;
-  ctx.stroke();
-  
-  // Draw measurement line
-  ctx.beginPath();
-  ctx.moveTo(startOffsetX, startOffsetY);
-  ctx.lineTo(endOffsetX, endOffsetY);
-  ctx.stroke();
-  
-  // Draw arrows
-  const arrowSize = 5;
-  const arrowAngle = Math.PI / 6; // 30 degrees
-  
-  // Start arrow
-  ctx.beginPath();
-  ctx.moveTo(startOffsetX, startOffsetY);
-  ctx.lineTo(
-    startOffsetX + arrowSize * Math.cos(angle + Math.PI - arrowAngle),
-    startOffsetY + arrowSize * Math.sin(angle + Math.PI - arrowAngle)
-  );
-  ctx.moveTo(startOffsetX, startOffsetY);
-  ctx.lineTo(
-    startOffsetX + arrowSize * Math.cos(angle + Math.PI + arrowAngle),
-    startOffsetY + arrowSize * Math.sin(angle + Math.PI + arrowAngle)
-  );
-  ctx.stroke();
-  
-  // End arrow
-  ctx.beginPath();
-  ctx.moveTo(endOffsetX, endOffsetY);
-  ctx.lineTo(
-    endOffsetX + arrowSize * Math.cos(angle - arrowAngle),
-    endOffsetY + arrowSize * Math.sin(angle - arrowAngle)
-  );
-  ctx.moveTo(endOffsetX, endOffsetY);
-  ctx.lineTo(
-    endOffsetX + arrowSize * Math.cos(angle + arrowAngle),
-    endOffsetY + arrowSize * Math.sin(angle + arrowAngle)
-  );
-  ctx.stroke();
-  
-  // Draw measurement text
-  const midX = (startOffsetX + endOffsetX) / 2;
-  const midY = (startOffsetY + endOffsetY) / 2;
+function drawWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, offset: number, length?: number, walls?: WallData[]) {
+  const actualLength = length || getDistance(wall.start, wall.end);
   const measurement = pixelsToFeetAndInches(actualLength);
   
-  ctx.save();
-  ctx.translate(midX, midY);
+  // Position the text above or below the wall
+  const midX = (wall.start.x + wall.end.x) / 2;
+  const midY = (wall.start.y + wall.end.y) / 2;
   
-  // Keep text upright
+  // Calculate angle for rotating text
+  const angle = Math.atan2(wall.end.y - wall.start.y, wall.end.x - wall.start.x);
   let textAngle = angle;
-  if (angle > Math.PI/2 || angle < -Math.PI/2) {
-    textAngle += Math.PI;
+  if (Math.abs(angle) > Math.PI / 2) {
+    textAngle = angle - Math.PI;
   }
+  
+  ctx.save();
+  
+  // Move to the midpoint
+  ctx.translate(midX, midY);
   ctx.rotate(textAngle);
   
-  // Draw white background for text
-  ctx.font = '10px Arial';
+  // Draw text
+  ctx.font = "12px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  
+  // Draw white background for better visibility
   const textMetrics = ctx.measureText(measurement);
   const padding = 2;
-  
-  ctx.fillStyle = 'white';
+  ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
   ctx.fillRect(
     -textMetrics.width / 2 - padding,
-    -6 - padding,
-    textMetrics.width + 2 * padding,
-    12 + 2 * padding
+    offset - 6,
+    textMetrics.width + padding * 2,
+    12
   );
   
-  // Draw text
-  ctx.fillStyle = '#666666';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(measurement, 0, 0);
+  // Draw the measurement text
+  ctx.fillStyle = "#000";
+  ctx.fillText(measurement, 0, offset);
   
   ctx.restore();
 }
@@ -176,101 +109,7 @@ function getInteriorWallLength(wall: WallData): number {
   return Math.max(0, totalLength - wall.thickness);
 }
 
-// Helper function to normalize measurements for parallel walls
-function normalizeParallelMeasurements(walls: WallData[]): Map<string, number> {
-  const measurements = new Map<string, number>();
-  
-  for (let i = 0; i < walls.length; i++) {
-    for (let j = i + 1; j < walls.length; j++) {
-      const wall1 = walls[i];
-      const wall2 = walls[j];
-      
-      if (areWallsParallel(wall1, wall2)) {
-        const dist = getParallelWallDistance(wall1, wall2);
-        if (dist > 200) continue; // Skip if walls are too far apart
-        
-        const length1 = getInteriorWallLength(wall1);
-        const length2 = getInteriorWallLength(wall2);
-        
-        // Use the average length for both walls
-        const avgLength = (length1 + length2) / 2;
-        const key1 = `${wall1.start.x},${wall1.start.y}-${wall1.end.x},${wall1.end.y}`;
-        const key2 = `${wall2.start.x},${wall2.start.y}-${wall2.end.x},${wall2.end.y}`;
-        
-        measurements.set(key1, avgLength);
-        measurements.set(key2, avgLength);
-      }
-    }
-  }
-  
-  return measurements;
-}
-
-// Helper function to find wall intersections
-function findWallIntersections(wall: WallData, walls: WallData[]): Point2D[] {
-  const intersections: Set<string> = new Set(); // Use Set to avoid duplicates
-  
-  for (const otherWall of walls) {
-    if (wall === otherWall) continue;
-    
-    // Skip curved walls for now
-    if (wall.controlPoints?.length || otherWall.controlPoints?.length) continue;
-    
-    // Only consider walls that are parallel or perpendicular
-    const angle = getWallAngle(wall, otherWall);
-    if (angle > 0.1 && Math.abs(angle - Math.PI/2) > 0.1) continue;
-    
-    // For parallel walls, only consider if they're directly across from each other
-    if (areWallsParallel(wall, otherWall)) {
-      const dist = getParallelWallDistance(wall, otherWall);
-      // Skip if walls are too far apart (not likely to be part of same room)
-      if (dist > 200) continue;
-      
-      // Only consider endpoints that are within the wall's span
-      const wallSpan = getWallSpan(wall);
-      const otherWallSpan = getWallSpan(otherWall);
-      
-      if (doSpansOverlap(wallSpan, otherWallSpan)) {
-        const points = [otherWall.start, otherWall.end];
-        for (const point of points) {
-          const projection = projectPointOnWall(point, wall);
-          if (projection) {
-            intersections.add(JSON.stringify(projection));
-          }
-        }
-      }
-    } else {
-      // For perpendicular walls, just check endpoints
-      const points = [otherWall.start, otherWall.end];
-      for (const point of points) {
-        const { distance, nearestPoint } = getDistanceToLineSegment(point, wall.start, wall.end);
-        if (distance <= POINT_TOLERANCE) {
-          intersections.add(JSON.stringify(nearestPoint));
-        }
-      }
-    }
-  }
-  
-  return Array.from(intersections).map(str => JSON.parse(str));
-}
-
-// Check if two walls are parallel
-function areWallsParallel(wall1: WallData, wall2: WallData): boolean {
-  const dx1 = wall1.end.x - wall1.start.x;
-  const dy1 = wall1.end.y - wall1.start.y;
-  const dx2 = wall2.end.x - wall2.start.x;
-  const dy2 = wall2.end.y - wall2.start.y;
-  
-  // Calculate angles and compare
-  const angle1 = Math.atan2(dy1, dx1);
-  const angle2 = Math.atan2(dy2, dx2);
-  
-  // Account for angles being the same or 180 degrees apart
-  const angleDiff = Math.abs(angle1 - angle2);
-  return angleDiff < 0.1 || Math.abs(angleDiff - Math.PI) < 0.1;
-}
-
-// Project a point onto a wall, return null if projection is outside wall segment
+// Helper function to project a point onto a wall, return null if projection is outside wall segment
 function projectPointOnWall(point: Point2D, wall: WallData): Point2D | null {
   const { nearestPoint } = getDistanceToLineSegment(point, wall.start, wall.end);
   
@@ -308,13 +147,6 @@ function findIntersection(p1: Point2D, p2: Point2D, p3: Point2D, p4: Point2D): P
 }
 
 // Helper function to calculate distance between two points
-function getDistance(p1: Point2D, p2: Point2D): number {
-  const dx = p2.x - p1.x;
-  const dy = p2.y - p1.y;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
-// Helper function to calculate distance from a point to a line segment
 function getDistanceToLineSegment(point: Point2D, lineStart: Point2D, lineEnd: Point2D): { distance: number; nearestPoint: Point2D } {
   const lineLength = getDistance(lineStart, lineEnd);
   if (lineLength === 0) {
@@ -344,13 +176,6 @@ function getWallAngle(wall1: WallData, wall2: WallData): number {
   return diff;
 }
 
-// Get the distance between parallel walls
-function getParallelWallDistance(wall1: WallData, wall2: WallData): number {
-  // Project start point of wall2 onto line of wall1
-  const { distance } = getDistanceToLineSegment(wall2.start, wall1.start, wall1.end);
-  return distance;
-}
-
 // Get the span of a wall (min/max coordinates in direction of wall)
 function getWallSpan(wall: WallData): { min: number; max: number } {
   const dx = wall.end.x - wall.start.x;
@@ -378,32 +203,6 @@ function doSpansOverlap(span1: { min: number; max: number }, span2: { min: numbe
 // Helper function to check if two points are equal within tolerance
 function arePointsEqual(p1: Point2D, p2: Point2D): boolean {
   return Math.abs(p1.x - p2.x) < POINT_TOLERANCE && Math.abs(p1.y - p2.y) < POINT_TOLERANCE;
-}
-
-// Helper function to check if a wall is part of a room boundary
-function isRoomBoundaryWall(wall: WallData, walls: WallData[]): boolean {
-  console.log("\nChecking if wall is boundary:", wall.id);
-  
-  // Get connecting walls
-  const connectingWalls = walls.filter(w => {
-    if (w === wall) return false;
-    return (
-      pointsAreClose(w.start, wall.start) ||
-      pointsAreClose(w.start, wall.end) ||
-      pointsAreClose(w.end, wall.start) ||
-      pointsAreClose(w.end, wall.end)
-    );
-  });
-  
-  console.log("Found connecting walls:", connectingWalls.map(w => w.id));
-  
-  // For now, consider any wall with perpendicular connections as a boundary
-  return connectingWalls.some(otherWall => {
-    const angle = getAngleBetweenWalls(wall, otherWall);
-    const isPerpendicular = Math.abs(angle - Math.PI/2) < 0.1 || Math.abs(angle - 3*Math.PI/2) < 0.1;
-    console.log(`Angle between ${wall.id} and ${otherWall.id}:`, angle, "isPerpendicular:", isPerpendicular);
-    return isPerpendicular;
-  });
 }
 
 // Helper function to find aligned walls that form a continuous boundary
@@ -474,139 +273,187 @@ function findAlignedBoundaryWalls(wall: WallData, walls: WallData[]): WallData[]
 export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
   console.log("\nDrawing walls:", walls.map(w => w.id));
   
+  // First normalize measurements for parallel walls
+  const normalizedMeasurements = normalizeParallelMeasurements(walls);
+  
+  // Calculate total area
+  const { totalArea } = calculateAreaAndVolume(walls, []);
+  
   // First draw all walls
-  walls.forEach(wall => {
+  walls.forEach((wall) => {
+    ctx.save();
+    ctx.strokeStyle = "#333";
+    ctx.lineWidth = 10;  // Changed from 2 to 10 for thicker walls
+    
     ctx.beginPath();
     ctx.moveTo(wall.start.x, wall.start.y);
-    ctx.lineTo(wall.end.x, wall.end.y);
-    ctx.lineWidth = wall.thickness;
-    ctx.strokeStyle = '#000000';
-    ctx.stroke();
     
+    if (wall.controlPoints && wall.controlPoints.length > 0) {
+      const start = wall.start;
+      const end = wall.end;
+      const cp = wall.controlPoints[0];
+
+      // Calculate midpoint and control point
+      const midX = (start.x + end.x) / 2;
+      const midY = (start.y + end.y) / 2;
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const normalX = -dy / dist;
+      const normalY = dx / dist;
+
+      // Calculate how far the control point is from the line
+      const cpDist = (cp.x - start.x) * normalX + (cp.y - start.y) * normalY;
+      
+      // Use quadratic curve for smoother control
+      const controlX = midX + normalX * cpDist;
+      const controlY = midY + normalY * cpDist;
+      
+      ctx.quadraticCurveTo(controlX, controlY, end.x, end.y);
+    } else {
+      ctx.lineTo(wall.end.x, wall.end.y);
+    }
+    ctx.stroke();
+
     // Draw endpoints
     ctx.beginPath();
     ctx.arc(wall.start.x, wall.start.y, 3, 0, 2 * Math.PI);
     ctx.arc(wall.end.x, wall.end.y, 3, 0, 2 * Math.PI);
     ctx.fillStyle = '#0000ff';
     ctx.fill();
+    
+    ctx.restore();
   });
   
   // Then draw measurements
-  const processedWalls = new Set<string>();
+  const processedWalls = new Set<WallData>();
   
   // First draw boundary measurements
   walls.forEach(wall => {
-    if (processedWalls.has(wall.id)) {
-      console.log(`Skipping processed wall: ${wall.id}`);
-      return;
-    }
+    if (processedWalls.has(wall)) return;
+    if (!isRoomBoundaryWall(wall, walls)) return;
     
-    if (!isRoomBoundaryWall(wall, walls)) {
-      console.log(`Not a boundary wall: ${wall.id}`);
-      return;
-    }
-    
-    console.log(`Processing boundary wall: ${wall.id}`);
-    
-    // Find all aligned walls that form this boundary
-    const alignedWalls = findAlignedBoundaryWalls(wall, walls);
-    console.log(`Found ${alignedWalls.length} aligned walls:`, alignedWalls.map(w => w.id));
-    
-    const combinedInfo = getCombinedWallInfo(alignedWalls);
-    
-    // Create a temporary wall for the full boundary measurement
-    const boundaryWall: WallData = {
-      id: wall.id + '_boundary',
-      start: combinedInfo.start,
-      end: combinedInfo.end,
-      thickness: wall.thickness,
-      controlPoints: []
-    };
+    // Find parallel walls that form this boundary
+    const parallelWalls = walls.filter(w => 
+      w !== wall && getParallelWallDistance(wall, w) < wall.thickness * 2
+    );
     
     // Draw the boundary measurement on the outside
-    drawWallMeasurement(ctx, boundaryWall, 25, combinedInfo.length, walls);
+    const wallKey = `${wall.start.x},${wall.start.y}-${wall.end.x},${wall.end.y}`;
+    const normalizedLength = normalizedMeasurements.get(wallKey);
+    drawWallMeasurement(ctx, wall, 25, normalizedLength, walls);
     
     // Mark all these walls as processed
-    alignedWalls.forEach(w => {
-      processedWalls.add(w.id);
-      console.log(`Marked as processed: ${w.id}`);
-    });
+    processedWalls.add(wall);
+    parallelWalls.forEach(w => processedWalls.add(w));
   });
   
   // Then draw interior measurements
   walls.forEach(wall => {
-    if (!processedWalls.has(wall.id)) {
-      console.log(`Drawing interior measurement for: ${wall.id}`);
-      const length = getDistance(wall.start, wall.end);
-      if (length >= 36) { // Only show interior measurements for walls >= 3 feet
+    if (!processedWalls.has(wall) && shouldShowWallMeasurement(wall, walls)) {
+      const intersections = findWallIntersections(wall, walls);
+      
+      if (intersections.length > 0) {
+        // Sort points along the wall from start to end
+        const points = [wall.start, ...intersections, wall.end].sort((a, b) => {
+          const distA = getDistance(wall.start, a);
+          const distB = getDistance(wall.start, b);
+          return distA - distB;
+        });
+        
+        // Draw measurements for each segment
+        for (let i = 0; i < points.length - 1; i++) {
+          const segmentWall: WallData = {
+            id: wall.id + '_segment_' + i,
+            start: points[i],
+            end: points[i + 1],
+            thickness: wall.thickness,
+            controlPoints: [],
+            height: wall.height  // Add height from parent wall
+          };
+          drawWallMeasurement(ctx, segmentWall, -25, undefined, walls);
+        }
+      } else {
         // Draw interior measurement
-        drawWallMeasurement(ctx, wall, -25, length, walls);
+        drawWallMeasurement(ctx, wall, -25, undefined, walls);
       }
     }
   });
+  
+  // Draw total area if we have a valid area
+  if (totalArea > 0) {
+    const areaText = `Area: ${Math.round(totalArea)} sq ft`;
+    ctx.save();
+    ctx.font = "14px Arial";
+    ctx.fillStyle = "#000";
+    ctx.fillText(areaText, 10, 20);
+    ctx.restore();
+  }
 }
 
 export function drawInProgressWall(ctx: CanvasRenderingContext2D, wall: WallData) {
+  ctx.save();
+  ctx.strokeStyle = "#d00";
+  ctx.lineWidth = 2;
+
   ctx.beginPath();
   ctx.moveTo(wall.start.x, wall.start.y);
   
   if (wall.controlPoints && wall.controlPoints.length > 0) {
-    // Draw curved wall preview
-    ctx.quadraticCurveTo(
-      wall.controlPoints[0].x,
-      wall.controlPoints[0].y,
-      wall.end.x,
-      wall.end.y
-    );
+    const start = wall.start;
+    const end = wall.end;
+    const cp = wall.controlPoints[0];
+
+    // Calculate midpoint and control point
+    const midX = (start.x + end.x) / 2;
+    const midY = (start.y + end.y) / 2;
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const normalX = -dy / dist;
+    const normalY = dx / dist;
+
+    // Calculate how far the control point is from the line
+    const cpDist = (cp.x - start.x) * normalX + (cp.y - start.y) * normalY;
+    
+    // Use quadratic curve for smoother control
+    const controlX = midX + normalX * cpDist;
+    const controlY = midY + normalY * cpDist;
+    
+    ctx.quadraticCurveTo(controlX, controlY, end.x, end.y);
   } else {
-    // Draw straight wall preview
     ctx.lineTo(wall.end.x, wall.end.y);
   }
-  
-  ctx.setLineDash([5, 5]);
-  ctx.lineWidth = wall.thickness;
-  ctx.strokeStyle = '#666666';
   ctx.stroke();
-  ctx.setLineDash([]);
-  
-  // Draw endpoints
-  ctx.beginPath();
-  ctx.arc(wall.start.x, wall.start.y, 3, 0, 2 * Math.PI);
-  ctx.arc(wall.end.x, wall.end.y, 3, 0, 2 * Math.PI);
-  ctx.fillStyle = '#0000ff';
-  ctx.fill();
-  
-  // Draw measurement with offset
-  drawWallMeasurement(ctx, wall, 20, undefined, []);
-}
 
-// Draw measurements for wall segments
-export function drawWallSegmentMeasurements(ctx: CanvasRenderingContext2D, walls: WallData[]) {
-  walls.forEach(wall => {
-    // Find all intersection points on this wall
-    const intersections = findWallIntersections(wall, walls);
-    if (intersections.length > 0) {
-      // Sort points along the wall from start to end
-      const points = [wall.start, ...intersections, wall.end].sort((a, b) => {
-        const distA = getDistance(wall.start, a);
-        const distB = getDistance(wall.start, b);
-        return distA - distB;
-      });
-      
-      // Draw measurements for each segment
-      for (let i = 0; i < points.length - 1; i++) {
-        // Create a temporary wall object for each segment
-        const segmentWall: WallData = {
-          id: wall.id + '_segment_' + i,
-          start: points[i],
-          end: points[i + 1],
-          thickness: wall.thickness,
-          controlPoints: []
-        };
-        drawWallMeasurement(ctx, segmentWall, 25, undefined, walls);
-      }
-    }
-  });
+  // Draw measurement for in-progress wall
+  const length = getDistance(wall.start, wall.end);
+  const measurement = pixelsToFeetAndInches(length);
+  
+  // Position the text above the wall
+  const midX = (wall.start.x + wall.end.x) / 2;
+  const midY = (wall.start.y + wall.end.y) / 2;
+  
+  ctx.font = "12px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  
+  // Draw white background
+  const textMetrics = ctx.measureText(measurement);
+  const padding = 2;
+  ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+  ctx.fillRect(
+    midX - textMetrics.width / 2 - padding,
+    midY - 40,
+    textMetrics.width + padding * 2,
+    16
+  );
+  
+  // Draw the measurement text
+  ctx.fillStyle = "#d00"; // Use red for in-progress measurement
+  ctx.fillText(measurement, midX, midY - 25);
+  
+  ctx.restore();
 }
 
 // Helper function to get the combined wall length and endpoints
@@ -637,7 +484,7 @@ function getCombinedWallInfo(walls: WallData[]): { start: Point2D; end: Point2D;
     { x: minX, y: firstWall.start.y } :
     { x: firstWall.start.x, y: minY };
   
-  const end = isHorizontal ?
+  const end = isHorizontal ? 
     { x: maxX, y: firstWall.end.y } :
     { x: firstWall.end.x, y: maxY };
   
@@ -666,4 +513,33 @@ function getAngleBetweenWalls(wall1: WallData, wall2: WallData): number {
   let diff = Math.abs(angle1 - angle2);
   if (diff > Math.PI) diff = 2 * Math.PI - diff;
   return diff;
+}
+
+export function drawWallSegmentMeasurements(ctx: CanvasRenderingContext2D, walls: WallData[]) {
+  walls.forEach(wall => {
+    // Find all intersection points on this wall
+    const intersections = findWallIntersections(wall, walls);
+    if (intersections.length > 0) {
+      // Sort points along the wall from start to end
+      const points = [wall.start, ...intersections, wall.end].sort((a, b) => {
+        const distA = getDistance(wall.start, a);
+        const distB = getDistance(wall.start, b);
+        return distA - distB;
+      });
+      
+      // Draw measurements for each segment
+      for (let i = 0; i < points.length - 1; i++) {
+        // Create a temporary wall object for each segment
+        const segmentWall: WallData = {
+          id: wall.id + '_segment_' + i,
+          start: points[i],
+          end: points[i + 1],
+          thickness: wall.thickness,
+          controlPoints: [],
+          height: wall.height  // Add height from parent wall
+        };
+        drawWallMeasurement(ctx, segmentWall, 25, undefined, walls);
+      }
+    }
+  });
 }
