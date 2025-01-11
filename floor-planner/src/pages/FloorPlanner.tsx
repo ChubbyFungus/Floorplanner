@@ -21,7 +21,7 @@ export const FloorPlanner: React.FC = () => {
   const { angleSnapEnabled, angleSnapIncrement, showGrid, snapToGrid, selectedTool, errorMessage } = ui;
 
   const floorPlanner = useSelector((state: RootState) => state.floorPlanner);
-  const { walls, fixtures } = floorPlanner;
+  const { walls, fixtures, dimensions } = floorPlanner;
 
   const [localAngleSnap, setLocalAngleSnap] = useState(angleSnapIncrement);
 
@@ -121,6 +121,12 @@ export const FloorPlanner: React.FC = () => {
         >
           Room Tool
         </Button>
+      </Box>
+
+      <Box mb={2}>
+        <Typography variant="body1">
+          Total Area: {Math.round(dimensions.totalArea / (50 * 50))} sq ft
+        </Typography>
       </Box>
 
       <Typography variant="h6" gutterBottom>

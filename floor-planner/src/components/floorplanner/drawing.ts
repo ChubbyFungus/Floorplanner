@@ -1,5 +1,6 @@
 // drawing.ts
 import { WallData } from "../../types";
+import { pixelsToFeetAndInches } from "../../utils/geometryUtils";
 
 export function drawWalls(ctx: CanvasRenderingContext2D, wallArray: WallData[]) {
   ctx.save();
@@ -35,6 +36,39 @@ export function drawWalls(ctx: CanvasRenderingContext2D, wallArray: WallData[]) 
       ctx.lineTo(wall.end.x, wall.end.y);
     }
     ctx.stroke();
+
+    // Draw measurement
+    const dx = wall.end.x - wall.start.x;
+    const dy = wall.end.y - wall.start.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const measurement = pixelsToFeetAndInches(distance);
+    
+    // Position the text above the wall
+    const midX = (wall.start.x + wall.end.x) / 2;
+    const midY = (wall.start.y + wall.end.y) / 2;
+    const offset = 15; // Offset the text above the wall
+    
+    ctx.save();
+    ctx.fillStyle = "#000";
+    ctx.font = "12px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    
+    // Draw white background for better visibility
+    const textMetrics = ctx.measureText(measurement);
+    const padding = 2;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.fillRect(
+      midX - textMetrics.width / 2 - padding,
+      midY - offset - 12 - padding,
+      textMetrics.width + padding * 2,
+      16
+    );
+    
+    // Draw the measurement text
+    ctx.fillStyle = "#000";
+    ctx.fillText(measurement, midX, midY - offset);
+    ctx.restore();
   });
   ctx.restore();
 }
@@ -73,5 +107,37 @@ export function drawInProgressWall(ctx: CanvasRenderingContext2D, wall: WallData
     ctx.lineTo(wall.end.x, wall.end.y);
   }
   ctx.stroke();
+
+  // Draw measurement for in-progress wall
+  const dx = wall.end.x - wall.start.x;
+  const dy = wall.end.y - wall.start.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  const measurement = pixelsToFeetAndInches(distance);
+  
+  // Position the text above the wall
+  const midX = (wall.start.x + wall.end.x) / 2;
+  const midY = (wall.start.y + wall.end.y) / 2;
+  const offset = 15;
+  
+  ctx.fillStyle = "#000";
+  ctx.font = "12px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  
+  // Draw white background
+  const textMetrics = ctx.measureText(measurement);
+  const padding = 2;
+  ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+  ctx.fillRect(
+    midX - textMetrics.width / 2 - padding,
+    midY - offset - 12 - padding,
+    textMetrics.width + padding * 2,
+    16
+  );
+  
+  // Draw the measurement text
+  ctx.fillStyle = "#d00"; // Use red for in-progress measurement
+  ctx.fillText(measurement, midX, midY - offset);
+  
   ctx.restore();
 }

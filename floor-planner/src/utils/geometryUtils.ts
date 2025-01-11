@@ -154,3 +154,25 @@ function triangleArea(arr: number[], i0: number, i1: number, i2: number): number
       x2 * (y0 - y1)
   ) / 2;
 }
+
+// Conversion constants (1 foot = 12 inches)
+const PIXELS_PER_FOOT = 50; // Adjust this value to change the scale
+const PIXELS_PER_INCH = PIXELS_PER_FOOT / 12;
+
+export function pixelsToFeetAndInches(pixels: number): string {
+  const totalInches = pixels / PIXELS_PER_INCH;
+  const feet = Math.floor(totalInches / 12);
+  const inches = Math.round(totalInches % 12);
+  
+  if (feet === 0) {
+    return `${inches}"`;
+  } else if (inches === 0) {
+    return `${feet}'`;
+  } else {
+    return `${feet}' ${inches}"`;
+  }
+}
+
+export function feetAndInchesToPixels(feet: number, inches: number = 0): number {
+  return (feet * PIXELS_PER_FOOT) + (inches * PIXELS_PER_INCH);
+}
