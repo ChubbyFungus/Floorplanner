@@ -17,7 +17,7 @@ import {
 import { createRectangularRoom } from "../../store/slices/roomToolSlice";
 import { v4 as uuidv4 } from "uuid";
 import { drawWalls, drawInProgressWall } from "./drawing";
-import { wouldCompleteShape, isConnectedToExistingWall } from "../../utils/geometryUtils";
+import { wouldCompleteShape, isConnectedToExistingWall, arePointsEqual } from "../../utils/geometryUtils";
 
 export const FloorPlanner2D: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -159,6 +159,18 @@ export const FloorPlanner2D: React.FC = () => {
     };
   }, [angleSnapEnabled, angleSnapIncrement]);
 
+  const findNearestEndpoint = useCallback((point: Point2D): Point2D | null => {
+    for (const wall of walls) {
+      if (arePointsEqual(point, wall.start)) {
+        return wall.start;
+      }
+      if (arePointsEqual(point, wall.end)) {
+        return wall.end;
+      }
+    }
+    return null;
+  }, [walls]);
+
   const getMousePosition = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
@@ -177,24 +189,31 @@ export const FloorPlanner2D: React.FC = () => {
     if (!canvasRef.current) return;
 
     const point = getMousePosition(e);
-    setMousePos(point);
-
+    
     if (selectedTool === 'wall' && wallInProgress) {
+      // First snap to angle
+      const snappedPoint = snapAngle(wallInProgress.start, point);
+      
+      // Then check if we're near an existing endpoint
+      const nearestEndpoint = findNearestEndpoint(snappedPoint);
+      const finalPoint = nearestEndpoint || snappedPoint;
+      
       if (isAltPressed) {
         // When Alt is pressed, either update or add control point
         if (wallInProgress.controlPoints && wallInProgress.controlPoints.length > 0) {
-          dispatch(updateLastControlPoint(point));
+          dispatch(updateLastControlPoint(finalPoint));
         } else {
-          dispatch(addWallControlPoint(point));
+          dispatch(addWallControlPoint(finalPoint));
         }
       } else {
-        // Normal wall end update with angle snapping
-        const snappedPoint = snapAngle(wallInProgress.start, point);
-        dispatch(updateWallEnd(snappedPoint));
+        // Normal wall end update with snapping
+        dispatch(updateWallEnd(finalPoint));
       }
     }
+    
+    setMousePos(point);
     redraw();
-  }, [dispatch, wallInProgress, isAltPressed, snapAngle, selectedTool, getMousePosition, redraw]);
+  }, [dispatch, wallInProgress, isAltPressed, snapAngle, selectedTool, getMousePosition, redraw, findNearestEndpoint]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current) return;
@@ -211,11 +230,17 @@ export const FloorPlanner2D: React.FC = () => {
           dispatch(addWallControlPoint(point));
         } else {
           console.log('Creating wall section');
+          // First snap to angle
           const snappedPoint = snapAngle(wallInProgress.start, point);
+          
+          // Then check if we're near an existing endpoint
+          const nearestEndpoint = findNearestEndpoint(snappedPoint);
+          const finalPoint = nearestEndpoint || snappedPoint;
+          
           const newWall = {
             id: uuidv4(),
             start: wallInProgress.start,
-            end: snappedPoint,
+            end: finalPoint,
             controlPoints: wallInProgress.controlPoints || [],
             thickness: 10,
             height: 280
@@ -232,7 +257,7 @@ export const FloorPlanner2D: React.FC = () => {
           } else {
             console.log('Starting new wall section');
             dispatch(addWall(newWall));
-            dispatch(startWall(snappedPoint));
+            dispatch(startWall(finalPoint));
           }
         }
       } else {
