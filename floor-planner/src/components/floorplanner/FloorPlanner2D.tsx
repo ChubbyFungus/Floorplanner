@@ -11,11 +11,13 @@ import {
   updateLastControlPoint,
   addWall,
   clearCanvas,
-  cancelWall
+  cancelWall,
+  finalizeWall
 } from "../../store/slices/floorPlannerSlice";
 import { createRectangularRoom } from "../../store/slices/roomToolSlice";
 import { v4 as uuidv4 } from "uuid";
 import { drawWalls, drawInProgressWall } from "./drawing";
+import { wouldCompleteShape, isConnectedToExistingWall } from "../../utils/geometryUtils";
 
 export const FloorPlanner2D: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -202,20 +204,32 @@ export const FloorPlanner2D: React.FC = () => {
         } else {
           // Complete current wall section with angle snapping
           const snappedPoint = snapAngle(wallInProgress.start, point);
-          dispatch(addWall({
+          const newWall = {
             id: uuidv4(),
             start: wallInProgress.start,
             end: snappedPoint,
             controlPoints: wallInProgress.controlPoints || [],
             thickness: 10,
             height: 280
-          }));
-          
-          // Start new wall section from the end point
-          dispatch(startWall(snappedPoint));
+          };
+
+          // Check if this wall would complete a shape
+          if (wouldCompleteShape(newWall, walls)) {
+            // Add the final wall and end wall drawing
+            dispatch(addWall(newWall));
+            dispatch(finalizeWall());
+          } else {
+            // Add the wall and start a new one from the end point
+            dispatch(addWall(newWall));
+            dispatch(startWall(snappedPoint));
+          }
         }
       } else {
-        dispatch(startWall(point));
+        // Only start a new wall if clicking near an existing wall endpoint
+        // or if there are no walls yet
+        if (walls.length === 0 || isConnectedToExistingWall(point, walls)) {
+          dispatch(startWall(point));
+        }
       }
     } else if (selectedTool === 'room') {
       if (!roomStart) {
@@ -235,7 +249,7 @@ export const FloorPlanner2D: React.FC = () => {
         setRoomStart(null);
       }
     }
-  }, [dispatch, wallInProgress, isAltPressed, snapAngle, selectedTool, roomStart, getMousePosition]);
+  }, [dispatch, wallInProgress, isAltPressed, snapAngle, selectedTool, roomStart, getMousePosition, walls]);
 
   // Redraw whenever relevant state changes
   useEffect(() => {

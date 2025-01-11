@@ -176,3 +176,72 @@ export function pixelsToFeetAndInches(pixels: number): string {
 export function feetAndInchesToPixels(feet: number, inches: number = 0): number {
   return (feet * PIXELS_PER_FOOT) + (inches * PIXELS_PER_INCH);
 }
+
+// Tolerance for considering points as equal (in pixels)
+const POINT_TOLERANCE = 5;
+
+// Check if two points are effectively the same within a tolerance
+export function arePointsEqual(p1: Point2D, p2: Point2D): boolean {
+  const dx = p1.x - p2.x;
+  const dy = p1.y - p2.y;
+  return Math.sqrt(dx * dx + dy * dy) <= POINT_TOLERANCE;
+}
+
+// Find walls that connect to a given point
+export function findConnectedWalls(point: Point2D, walls: WallData[]): WallData[] {
+  return walls.filter(wall => 
+    arePointsEqual(wall.start, point) || arePointsEqual(wall.end, point)
+  );
+}
+
+// Check if a point is connected to any existing wall endpoint
+export function isConnectedToExistingWall(point: Point2D, walls: WallData[]): boolean {
+  return walls.some(wall => 
+    arePointsEqual(wall.start, point) || arePointsEqual(wall.end, point)
+  );
+}
+
+// Check if the current wall would complete a shape
+export function wouldCompleteShape(currentWall: WallData, existingWalls: WallData[]): boolean {
+  // Need at least 2 existing walls to form a shape
+  if (existingWalls.length < 2) return false;
+
+  // Find walls connected to the current wall's end point
+  const connectedToEnd = findConnectedWalls(currentWall.end, existingWalls);
+  if (connectedToEnd.length === 0) return false;
+
+  // Find walls connected to the current wall's start point
+  const connectedToStart = findConnectedWalls(currentWall.start, existingWalls);
+  if (connectedToStart.length === 0) return false;
+
+  // Try to trace a path from end to start
+  const visited = new Set<string>();
+  
+  function canTracePathToStart(currentPoint: Point2D, targetPoint: Point2D, depth: number = 0): boolean {
+    // Prevent infinite recursion
+    if (depth > existingWalls.length) return false;
+    
+    // Check if we've reached the target
+    if (arePointsEqual(currentPoint, targetPoint)) return true;
+
+    // Find all connected walls we haven't visited yet
+    const connected = findConnectedWalls(currentPoint, existingWalls)
+      .filter(wall => !visited.has(wall.id));
+
+    // Try each connected wall
+    for (const wall of connected) {
+      visited.add(wall.id);
+      
+      // Try both endpoints of the wall
+      const nextPoint = arePointsEqual(wall.start, currentPoint) ? wall.end : wall.start;
+      if (canTracePathToStart(nextPoint, targetPoint, depth + 1)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // Try to find a path from the end point back to the start point
+  return canTracePathToStart(currentWall.end, currentWall.start);
+}
