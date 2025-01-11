@@ -1,0 +1,156 @@
+import { WallData, FixtureData, Point2D } from "../types";
+import earcut from "earcut";
+
+interface CalcResult {
+  totalArea: number;
+  totalVolume: number;
+}
+
+export function calculateAreaAndVolume(
+  walls: WallData[],
+  fixtures: FixtureData[]
+): CalcResult {
+  const loops = findAllLoops(walls);
+  let totalRawArea = 0;
+
+  loops.forEach((loop) => {
+    const polygonPoints = subdivideWallsIntoPolygon(loop);
+    totalRawArea += polygonArea(polygonPoints);
+  });
+
+  // average height
+  const avgHeight =
+    walls.reduce((acc, w) => acc + w.height, 0) / (walls.length || 1);
+
+  const totalVolume = totalRawArea * avgHeight;
+
+  return {
+    totalArea: totalRawArea,
+    totalVolume
+  };
+}
+
+function findAllLoops(walls: WallData[]): WallData[][] {
+  const unused = new Set(walls.map((w) => w.id));
+  const loops: WallData[][] = [];
+
+  const startMap = new Map<string, WallData[]>();
+  const endMap = new Map<string, WallData[]>();
+
+  walls.forEach((w) => {
+    const startKey = pointKey(w.start);
+    const endKey = pointKey(w.end);
+
+    if (!startMap.has(startKey)) startMap.set(startKey, []);
+    startMap.get(startKey)!.push(w);
+
+    if (!endMap.has(endKey)) endMap.set(endKey, []);
+    endMap.get(endKey)!.push(w);
+  });
+
+  while (unused.size > 0) {
+    const seedWallId = unused.values().next().value;
+    const seedWall = walls.find((w) => w.id === seedWallId)!;
+    const currentLoop: WallData[] = [];
+    currentLoop.push(seedWall);
+    unused.delete(seedWallId);
+
+    let currentEnd = seedWall.end;
+
+    while (true) {
+      const match = (startMap.get(pointKey(currentEnd)) || []).find((w) =>
+        unused.has(w.id)
+      );
+      if (!match) {
+        // try flipping
+        const revMatch = (endMap.get(pointKey(currentEnd)) || []).find((w) =>
+          unused.has(w.id)
+        );
+        if (!revMatch) {
+          break;
+        } else {
+          reverseWall(revMatch);
+          currentLoop.push(revMatch);
+          unused.delete(revMatch.id);
+          currentEnd = revMatch.end;
+        }
+      } else {
+        currentLoop.push(match);
+        unused.delete(match.id);
+        currentEnd = match.end;
+      }
+      if (pointKey(currentEnd) === pointKey(seedWall.start)) {
+        break;
+      }
+    }
+    loops.push(currentLoop);
+  }
+
+  return loops;
+}
+
+function reverseWall(wall: WallData) {
+  const tmp = wall.start;
+  wall.start = wall.end;
+  wall.end = tmp;
+  if (wall.controlPoints && wall.controlPoints.length > 0) {
+    wall.controlPoints.reverse();
+  }
+}
+
+function pointKey(pt: Point2D): string {
+  return `${Math.round(pt.x * 1000) / 1000}_${Math.round(pt.y * 1000) / 1000}`;
+}
+
+function subdivideWallsIntoPolygon(wallLoop: WallData[]): Point2D[] {
+  const polygon: Point2D[] = [];
+  wallLoop.forEach((wall, idx) => {
+    const subdivided = subdivideWall(wall);
+    if (idx < wallLoop.length - 1) {
+      subdivided.pop();
+    }
+    polygon.push(...subdivided);
+  });
+  return polygon;
+}
+
+function subdivideWall(wall: WallData): Point2D[] {
+  if (!wall.controlPoints || wall.controlPoints.length === 0) {
+    return [wall.start, wall.end];
+  }
+  const points: Point2D[] = [wall.start];
+  wall.controlPoints.forEach((cp) => points.push(cp));
+  points.push(wall.end);
+  return points;
+}
+
+function polygonArea(points: Point2D[]): number {
+  if (points.length < 3) return 0;
+  const flattened: number[] = [];
+  for (const p of points) {
+    flattened.push(p.x, p.y);
+  }
+  const indices = earcut(flattened);
+  let area = 0;
+  for (let i = 0; i < indices.length; i += 3) {
+    const a = indices[i];
+    const b = indices[i + 1];
+    const c = indices[i + 2];
+    area += triangleArea(flattened, a, b, c);
+  }
+  return area;
+}
+
+function triangleArea(arr: number[], i0: number, i1: number, i2: number): number {
+  const x0 = arr[i0 * 2];
+  const y0 = arr[i0 * 2 + 1];
+  const x1 = arr[i1 * 2];
+  const y1 = arr[i1 * 2 + 1];
+  const x2 = arr[i2 * 2];
+  const y2 = arr[i2 * 2 + 1];
+  return Math.abs(
+    x0 * (y1 - y2) +
+      x1 * (y2 - y0) +
+      x2 * (y0 - y1)
+  ) / 2;
+}
