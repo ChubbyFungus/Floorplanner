@@ -6,7 +6,8 @@ const PIXELS_PER_FOOT = 50;  // 50 pixels = 1 foot
 const PIXELS_PER_INCH = PIXELS_PER_FOOT / 12;  // pixels per inch
 
 // Constants for geometry calculations
-export const POINT_TOLERANCE = 20; // Increased from default for easier snapping
+export const POINT_TOLERANCE = 30; // Increased for even easier snapping
+export const LINE_SNAP_TOLERANCE = 20; // Tolerance for snapping to wall lines
 
 // Tolerance for considering points as equal (in pixels)
 // const POINT_TOLERANCE = 10; // Increased tolerance to account for DPI scaling
@@ -259,4 +260,71 @@ export function wouldCompleteShape(currentWall: WallData, existingWalls: WallDat
   }
 
   return false;
+}
+
+// Get distance between a point and a line segment
+export function getDistanceToLineSegment(point: Point2D, start: Point2D, end: Point2D): { distance: number; nearestPoint: Point2D } {
+  const A = point.x - start.x;
+  const B = point.y - start.y;
+  const C = end.x - start.x;
+  const D = end.y - start.y;
+
+  const dot = A * C + B * D;
+  const len_sq = C * C + D * D;
+  let param = -1;
+
+  if (len_sq !== 0) {
+    param = dot / len_sq;
+  }
+
+  let nearestPoint: Point2D;
+
+  if (param < 0) {
+    nearestPoint = start;
+  } else if (param > 1) {
+    nearestPoint = end;
+  } else {
+    nearestPoint = {
+      x: start.x + param * C,
+      y: start.y + param * D
+    };
+  }
+
+  const dx = point.x - nearestPoint.x;
+  const dy = point.y - nearestPoint.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+
+  return { distance, nearestPoint };
+}
+
+// Find nearest point on any wall
+export function findNearestWallPoint(point: Point2D, walls: WallData[]): Point2D | null {
+  let nearestPoint: Point2D | null = null;
+  let minDistance = Infinity;
+
+  // First check endpoints
+  for (const wall of walls) {
+    const distToStart = getDistance(point, wall.start);
+    const distToEnd = getDistance(point, wall.end);
+
+    if (distToStart < minDistance && distToStart <= POINT_TOLERANCE) {
+      minDistance = distToStart;
+      nearestPoint = wall.start;
+    }
+    if (distToEnd < minDistance && distToEnd <= POINT_TOLERANCE) {
+      minDistance = distToEnd;
+      nearestPoint = wall.end;
+    }
+
+    // Then check the wall line itself
+    if (!wall.controlPoints || wall.controlPoints.length === 0) {
+      const { distance, nearestPoint: linePoint } = getDistanceToLineSegment(point, wall.start, wall.end);
+      if (distance < minDistance && distance <= LINE_SNAP_TOLERANCE) {
+        minDistance = distance;
+        nearestPoint = linePoint;
+      }
+    }
+  }
+
+  return nearestPoint;
 }

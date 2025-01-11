@@ -161,7 +161,7 @@ export const FloorPlanner2D: React.FC = () => {
     };
   }, [angleSnapEnabled, angleSnapIncrement]);
 
-  const findNearestEndpoint = useCallback((point: Point2D): Point2D | null => {
+  const findNearestWallPoint = useCallback((point: Point2D, walls: any[]): Point2D | null => {
     let nearestPoint: Point2D | null = null;
     let minDistance = Infinity;
 
@@ -177,10 +177,28 @@ export const FloorPlanner2D: React.FC = () => {
         minDistance = distToEnd;
         nearestPoint = wall.end;
       }
+
+      // Check if point is on the wall
+      const wallVector = { x: wall.end.x - wall.start.x, y: wall.end.y - wall.start.y };
+      const pointVector = { x: point.x - wall.start.x, y: point.y - wall.start.y };
+      const dotProduct = wallVector.x * pointVector.x + wallVector.y * pointVector.y;
+      const wallLengthSquared = wallVector.x * wallVector.x + wallVector.y * wallVector.y;
+      const projection = dotProduct / wallLengthSquared;
+      if (projection >= 0 && projection <= 1) {
+        const projectedPoint = {
+          x: wall.start.x + projection * wallVector.x,
+          y: wall.start.y + projection * wallVector.y
+        };
+        const distance = getDistance(point, projectedPoint);
+        if (distance < minDistance && distance <= POINT_TOLERANCE) {
+          minDistance = distance;
+          nearestPoint = projectedPoint;
+        }
+      }
     }
 
     return nearestPoint;
-  }, [walls]);
+  }, []);
 
   const getMousePosition = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -205,9 +223,9 @@ export const FloorPlanner2D: React.FC = () => {
       // First snap to angle
       const snappedPoint = snapAngle(wallInProgress.start, point);
       
-      // Then check if we're near an existing endpoint
-      const nearestEndpoint = findNearestEndpoint(snappedPoint);
-      const finalPoint = nearestEndpoint || snappedPoint;
+      // Then check if we're near any wall or endpoint
+      const nearestPoint = findNearestWallPoint(snappedPoint, walls);
+      const finalPoint = nearestPoint || snappedPoint;
       
       if (isAltPressed) {
         // When Alt is pressed, either update or add control point
@@ -221,21 +239,31 @@ export const FloorPlanner2D: React.FC = () => {
         dispatch(updateWallEnd(finalPoint));
       }
       
-      // Draw snap indicator if we're near an endpoint
-      if (nearestEndpoint) {
+      // Draw snap indicator if we're snapping
+      if (nearestPoint) {
         const ctx = canvasRef.current.getContext('2d');
         if (ctx) {
           ctx.beginPath();
-          ctx.arc(nearestEndpoint.x, nearestEndpoint.y, 5, 0, 2 * Math.PI);
+          ctx.arc(nearestPoint.x, nearestPoint.y, 5, 0, 2 * Math.PI);
           ctx.fillStyle = '#00ff00';
           ctx.fill();
+          
+          // Draw line to snap point
+          ctx.beginPath();
+          ctx.moveTo(point.x, point.y);
+          ctx.lineTo(nearestPoint.x, nearestPoint.y);
+          ctx.strokeStyle = '#00ff00';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([5, 5]);
+          ctx.stroke();
+          ctx.setLineDash([]);
         }
       }
     }
     
     setMousePos(point);
     redraw();
-  }, [dispatch, wallInProgress, isAltPressed, snapAngle, selectedTool, getMousePosition, redraw, findNearestEndpoint]);
+  }, [dispatch, wallInProgress, isAltPressed, snapAngle, selectedTool, getMousePosition, redraw, walls]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current) return;
@@ -255,9 +283,9 @@ export const FloorPlanner2D: React.FC = () => {
           // First snap to angle
           const snappedPoint = snapAngle(wallInProgress.start, point);
           
-          // Then check if we're near an existing endpoint
-          const nearestEndpoint = findNearestEndpoint(snappedPoint);
-          const finalPoint = nearestEndpoint || snappedPoint;
+          // Then check if we're near any wall or endpoint
+          const nearestPoint = findNearestWallPoint(snappedPoint, walls);
+          const finalPoint = nearestPoint || snappedPoint;
           
           const newWall = {
             id: uuidv4(),
@@ -283,9 +311,11 @@ export const FloorPlanner2D: React.FC = () => {
           }
         }
       } else {
-        // Always allow placing the first wall
-        dispatch(startWall(point));
-        console.log('Started new wall at:', point);
+        // For the first click, also try to snap to existing walls
+        const nearestPoint = findNearestWallPoint(point, walls);
+        const startPoint = nearestPoint || point;
+        dispatch(startWall(startPoint));
+        console.log('Started new wall at:', startPoint);
       }
     } else if (selectedTool === 'room') {
       console.log(`Selected tool: ${selectedTool} (Room tool)`);
