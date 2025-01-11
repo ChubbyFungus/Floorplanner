@@ -217,11 +217,11 @@ export const FloorPlanner2D: React.FC = () => {
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
 
-    // Convert mouse coordinates to canvas coordinates
-    const x = (e.clientX - rect.left);
-    const y = (e.clientY - rect.top);
+    // Convert mouse coordinates to canvas coordinates, accounting for DPR
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
 
-    return { x, y };
+    return { x: x / dpr, y: y / dpr };
   }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
