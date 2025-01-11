@@ -11,20 +11,70 @@ function drawWallMeasurement(ctx: CanvasRenderingContext2D, start: Point2D, end:
   const length = Math.sqrt(dx * dx + dy * dy);
   const angle = Math.atan2(dy, dx);
   
-  // Calculate measurement text position
-  const midX = (start.x + end.x) / 2;
-  const midY = (start.y + end.y) / 2;
-  
-  // Offset perpendicular to the wall
+  // Calculate measurement line positions
   const offsetX = -Math.sin(angle) * offset;
   const offsetY = Math.cos(angle) * offset;
   
-  const textX = midX + offsetX;
-  const textY = midY + offsetY;
+  const startOffsetX = start.x + offsetX;
+  const startOffsetY = start.y + offsetY;
+  const endOffsetX = end.x + offsetX;
+  const endOffsetY = end.y + offsetY;
+  
+  // Draw extension lines
+  ctx.beginPath();
+  ctx.moveTo(start.x, start.y);
+  ctx.lineTo(startOffsetX, startOffsetY);
+  ctx.moveTo(end.x, end.y);
+  ctx.lineTo(endOffsetX, endOffsetY);
+  ctx.strokeStyle = '#666666';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  
+  // Draw measurement line with arrows
+  ctx.beginPath();
+  ctx.moveTo(startOffsetX, startOffsetY);
+  ctx.lineTo(endOffsetX, endOffsetY);
+  ctx.stroke();
+  
+  // Draw arrows
+  const arrowSize = 6;
+  const arrowAngle = Math.PI / 6; // 30 degrees
+  
+  // Start arrow
+  ctx.beginPath();
+  ctx.moveTo(startOffsetX, startOffsetY);
+  ctx.lineTo(
+    startOffsetX + arrowSize * Math.cos(angle + Math.PI - arrowAngle),
+    startOffsetY + arrowSize * Math.sin(angle + Math.PI - arrowAngle)
+  );
+  ctx.moveTo(startOffsetX, startOffsetY);
+  ctx.lineTo(
+    startOffsetX + arrowSize * Math.cos(angle + Math.PI + arrowAngle),
+    startOffsetY + arrowSize * Math.sin(angle + Math.PI + arrowAngle)
+  );
+  ctx.stroke();
+  
+  // End arrow
+  ctx.beginPath();
+  ctx.moveTo(endOffsetX, endOffsetY);
+  ctx.lineTo(
+    endOffsetX + arrowSize * Math.cos(angle - arrowAngle),
+    endOffsetY + arrowSize * Math.sin(angle - arrowAngle)
+  );
+  ctx.moveTo(endOffsetX, endOffsetY);
+  ctx.lineTo(
+    endOffsetX + arrowSize * Math.cos(angle + arrowAngle),
+    endOffsetY + arrowSize * Math.sin(angle + arrowAngle)
+  );
+  ctx.stroke();
   
   // Draw measurement text
+  const midX = (startOffsetX + endOffsetX) / 2;
+  const midY = (startOffsetY + endOffsetY) / 2;
+  const measurement = pixelsToFeetAndInches(length);
+  
   ctx.save();
-  ctx.translate(textX, textY);
+  ctx.translate(midX, midY);
   
   // Rotate text to match wall angle, but keep it readable
   let textAngle = angle;
@@ -34,21 +84,20 @@ function drawWallMeasurement(ctx: CanvasRenderingContext2D, start: Point2D, end:
   ctx.rotate(textAngle);
   
   // Draw white background for text
-  const measurement = pixelsToFeetAndInches(length);
   ctx.font = '12px Arial';
   const textMetrics = ctx.measureText(measurement);
-  const padding = 4;
+  const padding = 2;
   
   ctx.fillStyle = 'white';
   ctx.fillRect(
     -textMetrics.width / 2 - padding,
     -8 - padding,
-    textMetrics.width + padding * 2,
-    16 + padding * 2
+    textMetrics.width + 2 * padding,
+    16 + 2 * padding
   );
   
   // Draw text
-  ctx.fillStyle = '#000000';
+  ctx.fillStyle = '#666666';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(measurement, 0, 0);
