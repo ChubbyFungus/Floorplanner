@@ -483,10 +483,23 @@ export function normalizeParallelMeasurements(walls: WallData[]): Map<string, nu
 // Check if a wall measurement should be shown
 export function shouldShowWallMeasurement(wall: WallData, walls: WallData[]): boolean {
   const length = getDistance(wall.start, wall.end);
-  if (length < 36) return false; // Don't show measurements for walls shorter than 3 feet
+  
+  // Don't show measurements for walls shorter than 1 pixel (effectively 0)
+  if (length < 1) return false;
   
   // Always show measurements for boundary walls
-  if (isRoomBoundaryWall(wall, walls)) return true;
+  if (isRoomBoundaryWall(wall, walls)) {
+    // For boundary walls, check if it's a corner measurement (0')
+    const connectedWalls = findAllConnectedWalls(wall.start, walls)
+      .concat(findAllConnectedWalls(wall.end, walls))
+      .filter(w => w.id !== wall.id);
+      
+    // If this is a corner measurement (has perpendicular walls at both ends), don't show it
+    if (connectedWalls.length >= 2 && 
+        connectedWalls.every(w => Math.abs(getWallAngle(wall, w) - Math.PI/2) < 0.1)) {
+      return false;
+    }
+  }
   
   // For interior walls, only show if they're not too close to parallel walls
   const parallelWalls = walls.filter(w => 
@@ -502,4 +515,11 @@ export function isConnectedToExistingWall(point: Point2D, walls: WallData[]): bo
     arePointsEqual(wall.start, point) || 
     arePointsEqual(wall.end, point)
   );
+}
+
+// Helper function to get the angle between two walls
+function getWallAngle(wall1: WallData, wall2: WallData): number {
+  const angle1 = Math.atan2(wall1.end.y - wall1.start.y, wall1.end.x - wall1.start.x);
+  const angle2 = Math.atan2(wall2.end.y - wall2.start.y, wall2.end.x - wall2.start.x);
+  return Math.abs(angle1 - angle2);
 }
