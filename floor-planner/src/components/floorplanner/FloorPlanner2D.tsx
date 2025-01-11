@@ -16,7 +16,7 @@ import {
 } from "../../store/slices/floorPlannerSlice";
 import { createRectangularRoom } from "../../store/slices/roomToolSlice";
 import { v4 as uuidv4 } from "uuid";
-import { drawWalls, drawInProgressWall } from "./drawing";
+import { drawWalls, drawInProgressWall, drawWallSegmentMeasurements } from "./drawing";
 import { wouldCompleteShape, isConnectedToExistingWall, arePointsEqual, getDistance } from "../../utils/geometryUtils";
 
 const POINT_TOLERANCE = 10;
@@ -38,9 +38,8 @@ export const FloorPlanner2D: React.FC = () => {
   // Drawing functions
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const ctx = canvas?.getContext('2d');
+    if (!ctx || !canvas) return;
 
     // Get DPI scale
     const dpr = window.devicePixelRatio || 1;
@@ -52,6 +51,9 @@ export const FloorPlanner2D: React.FC = () => {
 
     // Draw existing walls
     drawWalls(ctx, walls);
+
+    // Draw wall segment measurements
+    drawWallSegmentMeasurements(ctx, walls);
 
     // Draw wall in progress
     if (wallInProgress) {
