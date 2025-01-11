@@ -411,7 +411,15 @@ export function drawWallSegmentMeasurements(ctx: CanvasRenderingContext2D, walls
       
       // Draw measurements for each segment
       for (let i = 0; i < points.length - 1; i++) {
-        drawWallMeasurement(ctx, points[i], points[i + 1], 20);
+        // Create a temporary wall object for each segment
+        const segmentWall: WallData = {
+          id: wall.id + '_segment_' + i,
+          start: points[i],
+          end: points[i + 1],
+          thickness: wall.thickness,
+          controlPoints: []
+        };
+        drawWallMeasurement(ctx, segmentWall, 25);
       }
     }
   });
