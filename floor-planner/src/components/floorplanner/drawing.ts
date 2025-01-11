@@ -316,65 +316,12 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
     }
     ctx.stroke();
     ctx.restore();
-  });
-  
-  // Then draw measurements
-  const processedWalls = new Set<WallData>();
-  
-  // First draw boundary measurements
-  walls.forEach(wall => {
-    if (processedWalls.has(wall)) return;
-    if (!isRoomBoundaryWall(wall, walls)) return;
-    
-    // Find parallel walls that form this boundary
-    const parallelWalls = walls.filter(w => 
-      w !== wall && getParallelWallDistance(wall, w) < wall.thickness * 2
-    );
-    
-    // Draw the boundary measurement on the outside
-    const wallKey = `${wall.start.x},${wall.start.y}-${wall.end.x},${wall.end.y}`;
-    const normalizedLength = normalizedMeasurements.get(wallKey);
-    drawWallMeasurement(ctx, wall, 25, normalizedLength, walls);
-    
-    // Mark all these walls as processed
-    processedWalls.add(wall);
-    parallelWalls.forEach(w => processedWalls.add(w));
-  });
-  
-  // Then draw interior measurements
-  walls.forEach(wall => {
-    if (!processedWalls.has(wall) && shouldShowWallMeasurement(wall, walls)) {
-      const intersections = findWallIntersections(wall, walls);
-      
-      if (intersections.length > 0) {
-        // Sort points along the wall from start to end
-        const points = [wall.start, ...intersections, wall.end].sort((a, b) => {
-          const distA = getDistance(wall.start, a);
-          const distB = getDistance(wall.start, b);
-          return distA - distB;
-        });
-        
-        // Draw measurements for each segment
-        for (let i = 0; i < points.length - 1; i++) {
-          const segmentLength = getDistance(points[i], points[i + 1]);
-          
-          // Skip segments shorter than 1 pixel (effectively 0)
-          if (segmentLength < 1) continue;
-          
-          const segmentWall: WallData = {
-            id: wall.id + '_segment_' + i,
-            start: points[i],
-            end: points[i + 1],
-            thickness: wall.thickness,
-            controlPoints: [],
-            height: wall.height
-          };
-          drawWallMeasurement(ctx, segmentWall, -25, undefined, walls);
-        }
-      } else {
-        // Draw interior measurement
-        drawWallMeasurement(ctx, wall, -25, undefined, walls);
-      }
+
+    // Draw measurement for this wall
+    const length = normalizedMeasurements.get(wall.id);
+    if (length !== undefined) {
+      const measurementOffset = shouldShowWallMeasurement(wall, walls) ? -25 : 25;
+      drawWallMeasurement(ctx, wall, measurementOffset, length, walls);
     }
   });
   
@@ -391,9 +338,10 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
 
 export function drawInProgressWall(ctx: CanvasRenderingContext2D, wall: WallData) {
   ctx.save();
-  ctx.strokeStyle = "#d00";
-  ctx.lineWidth = 2;
-
+  ctx.strokeStyle = "#333";  // Same color as regular walls
+  ctx.lineWidth = 10;  // Same thickness as regular walls
+  ctx.lineCap = "square";  // Same square caps as regular walls
+  
   ctx.beginPath();
   ctx.moveTo(wall.start.x, wall.start.y);
   
@@ -448,7 +396,7 @@ export function drawInProgressWall(ctx: CanvasRenderingContext2D, wall: WallData
   );
   
   // Draw the measurement text
-  ctx.fillStyle = "#d00"; // Use red for in-progress measurement
+  ctx.fillStyle = "#000"; // Use black for in-progress measurement
   ctx.fillText(measurement, midX, midY - 25);
   
   ctx.restore();
