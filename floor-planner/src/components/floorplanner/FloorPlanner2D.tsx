@@ -11,7 +11,7 @@ import {
   updateLastControlPoint,
   addWall,
   clearCanvas,
-  endWallDrawing
+  cancelWall
 } from "../../store/slices/floorPlannerSlice";
 import { createRectangularRoom } from "../../store/slices/roomToolSlice";
 import { v4 as uuidv4 } from "uuid";
@@ -246,7 +246,7 @@ export const FloorPlanner2D: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        dispatch(endWallDrawing());
+        dispatch(cancelWall());
       } else if (e.key === 'Alt') {
         setIsAltPressed(true);
       }
