@@ -166,6 +166,15 @@
    - Improve state management
    - Add proper typing to actions
 
+## [Unreleased]
+
+### Fixed
+- Fixed incorrect wall measurements by using consistent PIXELS_PER_FOOT value
+- Corrected area calculations to show accurate square footage
+
+### Changed
+- Adjusted zoom level to allow for larger room layouts (reduced PIXELS_PER_FOOT from 50 to 25)
+
 ## Testing Infrastructure
 
 ### Test Store Setup
