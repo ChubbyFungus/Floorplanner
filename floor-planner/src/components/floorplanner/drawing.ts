@@ -332,6 +332,61 @@ function doSpansOverlap(span1: { min: number; max: number }, span2: { min: numbe
   return !(span1.max < span2.min || span2.max < span1.min);
 }
 
+// Helper function to check if a wall is part of a room boundary
+function isRoomBoundaryWall(wall: WallData, walls: WallData[]): boolean {
+  let parallelCount = 0;
+  let perpendicularCount = 0;
+  
+  for (const otherWall of walls) {
+    if (wall === otherWall) continue;
+    
+    const angle = getWallAngle(wall, otherWall);
+    if (angle < 0.1) { // Parallel
+      const dist = getParallelWallDistance(wall, otherWall);
+      if (dist < 200) parallelCount++;
+    } else if (Math.abs(angle - Math.PI/2) < 0.1) { // Perpendicular
+      perpendicularCount++;
+    }
+  }
+  
+  return parallelCount >= 1 && perpendicularCount >= 2;
+}
+
+// Helper function to determine if a wall should show measurements
+function shouldShowWallMeasurement(wall: WallData, walls: WallData[]): boolean {
+  // Always show measurements for room boundary walls
+  if (isRoomBoundaryWall(wall, walls)) return true;
+  
+  // Show measurements for standalone walls
+  const connectedWalls = walls.filter(w => {
+    if (w === wall) return false;
+    return arePointsEqual(w.start, wall.start) || 
+           arePointsEqual(w.start, wall.end) ||
+           arePointsEqual(w.end, wall.start) ||
+           arePointsEqual(w.end, wall.end);
+  });
+  
+  return connectedWalls.length === 0;
+}
+
+// Helper function to check if a wall intersection should split the measurement
+function shouldSplitAtIntersection(wall: WallData, intersection: Point2D, walls: WallData[]): boolean {
+  // Find walls that connect at this intersection
+  const connectingWalls = walls.filter(w => {
+    if (w === wall) return false;
+    return arePointsEqual(w.start, intersection) || arePointsEqual(w.end, intersection);
+  });
+  
+  // Don't split if there's only one connecting wall and it's perpendicular
+  if (connectingWalls.length === 1) {
+    const angle = getWallAngle(wall, connectingWalls[0]);
+    return Math.abs(angle - Math.PI/2) > 0.1;
+  }
+  
+  // Split if there are multiple connecting walls
+  return connectingWalls.length > 1;
+}
+
 export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
   // First normalize measurements for parallel walls
   const normalizedMeasurements = normalizeParallelMeasurements(walls);
@@ -353,12 +408,41 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
     ctx.fillStyle = '#0000ff';
     ctx.fill();
     
-    // Get normalized measurement if available
-    const wallKey = `${wall.start.x},${wall.start.y}-${wall.end.x},${wall.end.y}`;
-    const normalizedLength = normalizedMeasurements.get(wallKey);
+    // Only show measurements for appropriate walls
+    if (shouldShowWallMeasurement(wall, walls)) {
+      const wallKey = `${wall.start.x},${wall.start.y}-${wall.end.x},${wall.end.y}`;
+      const normalizedLength = normalizedMeasurements.get(wallKey);
+      drawWallMeasurement(ctx, wall, 25, normalizedLength);
+    }
+  });
+  
+  // Draw segment measurements only for walls that need them
+  walls.forEach(wall => {
+    if (!shouldShowWallMeasurement(wall, walls)) return;
     
-    // Draw measurement with normalized length if available
-    drawWallMeasurement(ctx, wall, 25, normalizedLength);
+    const intersections = findWallIntersections(wall, walls)
+      .filter(intersection => shouldSplitAtIntersection(wall, intersection, walls));
+    
+    if (intersections.length > 0) {
+      // Sort points along the wall from start to end
+      const points = [wall.start, ...intersections, wall.end].sort((a, b) => {
+        const distA = getDistance(wall.start, a);
+        const distB = getDistance(wall.start, b);
+        return distA - distB;
+      });
+      
+      // Draw measurements for each segment
+      for (let i = 0; i < points.length - 1; i++) {
+        const segmentWall: WallData = {
+          id: wall.id + '_segment_' + i,
+          start: points[i],
+          end: points[i + 1],
+          thickness: wall.thickness,
+          controlPoints: []
+        };
+        drawWallMeasurement(ctx, segmentWall, 25);
+      }
+    }
   });
 }
 
