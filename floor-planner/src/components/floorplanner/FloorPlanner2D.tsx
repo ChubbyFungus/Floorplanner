@@ -17,7 +17,9 @@ import {
 import { createRectangularRoom } from "../../store/slices/roomToolSlice";
 import { v4 as uuidv4 } from "uuid";
 import { drawWalls, drawInProgressWall } from "./drawing";
-import { wouldCompleteShape, isConnectedToExistingWall, arePointsEqual } from "../../utils/geometryUtils";
+import { wouldCompleteShape, isConnectedToExistingWall, arePointsEqual, getDistance } from "../../utils/geometryUtils";
+
+const POINT_TOLERANCE = 10;
 
 export const FloorPlanner2D: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -160,15 +162,24 @@ export const FloorPlanner2D: React.FC = () => {
   }, [angleSnapEnabled, angleSnapIncrement]);
 
   const findNearestEndpoint = useCallback((point: Point2D): Point2D | null => {
+    let nearestPoint: Point2D | null = null;
+    let minDistance = Infinity;
+
     for (const wall of walls) {
-      if (arePointsEqual(point, wall.start)) {
-        return wall.start;
+      const distToStart = getDistance(point, wall.start);
+      const distToEnd = getDistance(point, wall.end);
+
+      if (distToStart < minDistance && distToStart <= POINT_TOLERANCE) {
+        minDistance = distToStart;
+        nearestPoint = wall.start;
       }
-      if (arePointsEqual(point, wall.end)) {
-        return wall.end;
+      if (distToEnd < minDistance && distToEnd <= POINT_TOLERANCE) {
+        minDistance = distToEnd;
+        nearestPoint = wall.end;
       }
     }
-    return null;
+
+    return nearestPoint;
   }, [walls]);
 
   const getMousePosition = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -208,6 +219,17 @@ export const FloorPlanner2D: React.FC = () => {
       } else {
         // Normal wall end update with snapping
         dispatch(updateWallEnd(finalPoint));
+      }
+      
+      // Draw snap indicator if we're near an endpoint
+      if (nearestEndpoint) {
+        const ctx = canvasRef.current.getContext('2d');
+        if (ctx) {
+          ctx.beginPath();
+          ctx.arc(nearestEndpoint.x, nearestEndpoint.y, 5, 0, 2 * Math.PI);
+          ctx.fillStyle = '#00ff00';
+          ctx.fill();
+        }
       }
     }
     

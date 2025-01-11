@@ -5,8 +5,11 @@ import earcut from "earcut";
 const PIXELS_PER_FOOT = 50;  // 50 pixels = 1 foot
 const PIXELS_PER_INCH = PIXELS_PER_FOOT / 12;  // pixels per inch
 
+// Constants for geometry calculations
+export const POINT_TOLERANCE = 20; // Increased from default for easier snapping
+
 // Tolerance for considering points as equal (in pixels)
-const POINT_TOLERANCE = 10; // Increased tolerance to account for DPI scaling
+// const POINT_TOLERANCE = 10; // Increased tolerance to account for DPI scaling
 
 interface CalcResult {
   totalArea: number;
@@ -185,6 +188,13 @@ export function arePointsEqual(p1: Point2D, p2: Point2D): boolean {
   const dx = p1.x - p2.x;
   const dy = p1.y - p2.y;
   return Math.sqrt(dx * dx + dy * dy) <= POINT_TOLERANCE;
+}
+
+// Get distance between two points
+export function getDistance(p1: Point2D, p2: Point2D): number {
+  const dx = p1.x - p2.x;
+  const dy = p1.y - p2.y;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
 // Find walls that connect to a given point

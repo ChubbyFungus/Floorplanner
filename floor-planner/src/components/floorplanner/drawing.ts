@@ -37,6 +37,13 @@ export function drawWalls(ctx: CanvasRenderingContext2D, wallArray: WallData[]) 
     }
     ctx.stroke();
 
+    // Draw endpoints
+    ctx.beginPath();
+    ctx.arc(wall.start.x, wall.start.y, 3, 0, 2 * Math.PI);
+    ctx.arc(wall.end.x, wall.end.y, 3, 0, 2 * Math.PI);
+    ctx.fillStyle = '#0000ff';
+    ctx.fill();
+
     // Draw measurement
     const dx = wall.end.x - wall.start.x;
     const dy = wall.end.y - wall.start.y;
@@ -107,6 +114,13 @@ export function drawInProgressWall(ctx: CanvasRenderingContext2D, wall: WallData
     ctx.lineTo(wall.end.x, wall.end.y);
   }
   ctx.stroke();
+
+  // Draw endpoints
+  ctx.beginPath();
+  ctx.arc(wall.start.x, wall.start.y, 3, 0, 2 * Math.PI);
+  ctx.arc(wall.end.x, wall.end.y, 3, 0, 2 * Math.PI);
+  ctx.fillStyle = '#0000ff';
+  ctx.fill();
 
   // Draw measurement for in-progress wall
   const dx = wall.end.x - wall.start.x;
