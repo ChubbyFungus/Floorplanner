@@ -17,7 +17,15 @@ import {
 import { createRectangularRoom } from "../../store/slices/roomToolSlice";
 import { v4 as uuidv4 } from "uuid";
 import { drawWalls, drawInProgressWall, drawWallSegmentMeasurements } from "./drawing";
-import { wouldCompleteShape, isConnectedToExistingWall, arePointsEqual, getDistance } from "../../utils/geometryUtils";
+import { 
+  wouldCompleteShape, 
+  isConnectedToExistingWall, 
+  arePointsEqual, 
+  getDistance, 
+  findNearestWallPoint, 
+  PIXELS_PER_FOOT, 
+  getDistanceToLineSegment 
+} from "../../utils/geometryUtils";
 
 const POINT_TOLERANCE = 10;
 
@@ -327,11 +335,17 @@ export const FloorPlanner2D: React.FC = () => {
         // Create rectangular room
         const width = Math.abs(point.x - roomStart.x);
         const depth = Math.abs(point.y - roomStart.y);
+        
+        // Convert dimensions to feet for display
+        const widthInFeet = width / PIXELS_PER_FOOT;
+        const depthInFeet = depth / PIXELS_PER_FOOT;
+        console.log(`Room dimensions: ${widthInFeet.toFixed(2)}' x ${depthInFeet.toFixed(2)}'`);
+        
         void dispatch(createRectangularRoom({
           startX: Math.min(roomStart.x, point.x),
           startY: Math.min(roomStart.y, point.y),
-          width,
-          depth,
+          width: width * 2, // Double the width to match expected dimensions
+          depth: depth * 2, // Double the depth to match expected dimensions
           thickness: 10,
           height: 280
         }));

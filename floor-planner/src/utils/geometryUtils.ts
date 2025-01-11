@@ -2,8 +2,8 @@ import { Point2D, WallData, FixtureData } from "../types";
 import earcut from "earcut";
 
 // Constants for unit conversion
-const PIXELS_PER_FOOT = 50;  // 50 pixels = 1 foot
-const PIXELS_PER_INCH = PIXELS_PER_FOOT / 12;  // pixels per inch
+export const PIXELS_PER_FOOT = 50;  // 50 pixels = 1 foot
+export const PIXELS_PER_INCH = PIXELS_PER_FOOT / 12;  // pixels per inch
 
 // Constants for geometry calculations
 export const POINT_TOLERANCE = 30; // Increased for even easier snapping
@@ -24,19 +24,35 @@ export function calculateAreaAndVolume(
   const loops = findAllLoops(walls);
   let totalRawArea = 0;
 
-  loops.forEach((loop) => {
+  loops.forEach((loop, index) => {
+    console.log(`\nProcessing Loop ${index}:`);
     const polygonPoints = subdivideWallsIntoPolygon(loop);
-    totalRawArea += polygonArea(polygonPoints);
+    
+    // Log the polygon points
+    console.log('Polygon points:');
+    polygonPoints.forEach((p, i) => {
+      console.log(`Point ${i}: (${p.x}, ${p.y})`);
+    });
+    
+    const loopArea = polygonArea(polygonPoints);
+    console.log(`Loop ${index} area in pixels²: ${loopArea}`);
+    console.log(`Loop ${index} area in sq ft: ${loopArea / (PIXELS_PER_FOOT * PIXELS_PER_FOOT)}`);
+    totalRawArea += loopArea;
   });
+
+  console.log('\nFinal calculations:');
+  console.log('Total raw area in pixels²:', totalRawArea);
+  const totalAreaInSqFeet = totalRawArea / (PIXELS_PER_FOOT * PIXELS_PER_FOOT);
+  console.log('Final area in sq ft:', totalAreaInSqFeet);
 
   // average height
   const avgHeight =
     walls.reduce((acc, w) => acc + w.height, 0) / (walls.length || 1);
 
-  const totalVolume = totalRawArea * avgHeight;
+  const totalVolume = totalAreaInSqFeet * avgHeight;
 
   return {
-    totalArea: totalRawArea,
+    totalArea: totalAreaInSqFeet,
     totalVolume
   };
 }
@@ -114,15 +130,25 @@ function pointKey(pt: Point2D): string {
 }
 
 function subdivideWallsIntoPolygon(wallLoop: WallData[]): Point2D[] {
-  const polygon: Point2D[] = [];
-  wallLoop.forEach((wall, idx) => {
-    const subdivided = subdivideWall(wall);
-    if (idx < wallLoop.length - 1) {
-      subdivided.pop();
-    }
-    polygon.push(...subdivided);
+  const points: Point2D[] = [];
+  
+  // Log the raw wall dimensions
+  wallLoop.forEach(wall => {
+    const width = Math.abs(wall.end.x - wall.start.x);
+    const height = Math.abs(wall.end.y - wall.start.y);
+    console.log(`Wall dimensions in pixels: ${width} x ${height}`);
+    console.log(`Wall dimensions in feet: ${width/PIXELS_PER_FOOT} x ${height/PIXELS_PER_FOOT}`);
   });
-  return polygon;
+  
+  wallLoop.forEach((wall, idx) => {
+    const wallPoints = subdivideWall(wall);
+    if (idx < wallLoop.length - 1) {
+      wallPoints.pop();
+    }
+    points.push(...wallPoints);
+  });
+  
+  return points;
 }
 
 function subdivideWall(wall: WallData): Point2D[] {
@@ -159,11 +185,17 @@ function triangleArea(arr: number[], i0: number, i1: number, i2: number): number
   const y1 = arr[i1 * 2 + 1];
   const x2 = arr[i2 * 2];
   const y2 = arr[i2 * 2 + 1];
-  return Math.abs(
+
+  // Using the shoelace formula for triangle area
+  const area = Math.abs(
     x0 * (y1 - y2) +
-      x1 * (y2 - y0) +
-      x2 * (y0 - y1)
+    x1 * (y2 - y0) +
+    x2 * (y0 - y1)
   ) / 2;
+
+  console.log('Triangle points:', { x0, y0, x1, y1, x2, y2 });
+  console.log('Triangle area:', area);
+  return area;
 }
 
 export function pixelsToFeetAndInches(pixels: number): string {
@@ -293,7 +325,7 @@ export function wouldCompleteShape(currentWall: WallData, existingWalls: WallDat
 }
 
 // Find points where a wall intersects with other walls
-function findWallIntersections(wall: WallData, walls: WallData[]): Point2D[] {
+export function findWallIntersections(wall: WallData, walls: WallData[]): Point2D[] {
   const intersections: Point2D[] = [];
   
   for (const otherWall of walls) {
@@ -380,4 +412,85 @@ export function findNearestWallPoint(point: Point2D, walls: WallData[]): Point2D
   }
 
   return nearestPoint;
+}
+
+// Get distance between parallel walls
+export function getParallelWallDistance(wall1: WallData, wall2: WallData): number {
+  const angle1 = Math.atan2(wall1.end.y - wall1.start.y, wall1.end.x - wall1.start.x);
+  const angle2 = Math.atan2(wall2.end.y - wall2.start.y, wall2.end.x - wall2.start.x);
+  
+  // Check if walls are parallel (angles are same or differ by PI)
+  if (Math.abs(angle1 - angle2) < 0.1 || Math.abs(Math.abs(angle1 - angle2) - Math.PI) < 0.1) {
+    const dx = wall2.start.x - wall1.start.x;
+    const dy = wall2.start.y - wall1.start.y;
+    return Math.abs(dx * Math.sin(angle1) - dy * Math.cos(angle1));
+  }
+  return Infinity;
+}
+
+// Check if a wall is part of room boundary
+export function isRoomBoundaryWall(wall: WallData, walls: WallData[]): boolean {
+  const connectedWalls = findAllConnectedWalls(wall.start, walls)
+    .concat(findAllConnectedWalls(wall.end, walls))
+    .filter(w => w !== wall);
+    
+  // A wall is a boundary if it has connecting walls at both ends
+  const hasStartConnection = connectedWalls.some(w => 
+    arePointsEqual(w.start, wall.start) || arePointsEqual(w.end, wall.start)
+  );
+  const hasEndConnection = connectedWalls.some(w => 
+    arePointsEqual(w.start, wall.end) || arePointsEqual(w.end, wall.end)
+  );
+  
+  return hasStartConnection && hasEndConnection;
+}
+
+// Normalize measurements for parallel walls to show the same length
+export function normalizeParallelMeasurements(walls: WallData[]): Map<string, number> {
+  const measurements = new Map<string, number>();
+  const processedWalls = new Set<WallData>();
+  
+  walls.forEach(wall => {
+    if (processedWalls.has(wall)) return;
+    
+    // Find parallel walls
+    const parallelWalls = walls.filter(w => 
+      w !== wall && getParallelWallDistance(wall, w) < wall.thickness * 2
+    );
+    
+    if (parallelWalls.length > 0) {
+      // Use the longest length for all parallel walls
+      const lengths = [wall, ...parallelWalls].map(w => getDistance(w.start, w.end));
+      const maxLength = Math.max(...lengths);
+      
+      // Store normalized length for each wall
+      [wall, ...parallelWalls].forEach(w => {
+        const key = `${w.start.x},${w.start.y}-${w.end.x},${w.end.y}`;
+        measurements.set(key, maxLength);
+        processedWalls.add(w);
+      });
+    } else {
+      const key = `${wall.start.x},${wall.start.y}-${wall.end.x},${wall.end.y}`;
+      measurements.set(key, getDistance(wall.start, wall.end));
+      processedWalls.add(wall);
+    }
+  });
+  
+  return measurements;
+}
+
+// Check if a wall measurement should be shown
+export function shouldShowWallMeasurement(wall: WallData, walls: WallData[]): boolean {
+  const length = getDistance(wall.start, wall.end);
+  if (length < 36) return false; // Don't show measurements for walls shorter than 3 feet
+  
+  // Always show measurements for boundary walls
+  if (isRoomBoundaryWall(wall, walls)) return true;
+  
+  // For interior walls, only show if they're not too close to parallel walls
+  const parallelWalls = walls.filter(w => 
+    w !== wall && getParallelWallDistance(wall, w) < wall.thickness * 4
+  );
+  
+  return parallelWalls.length === 0;
 }
