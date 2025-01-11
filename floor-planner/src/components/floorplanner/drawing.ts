@@ -5,7 +5,7 @@ import { pixelsToFeetAndInches } from "../../utils/geometryUtils";
 const POINT_TOLERANCE = 1e-6;
 
 // Helper function to draw wall measurement
-function drawWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, offset: number = 20, length?: number) {
+function drawWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, offset: number = 20, length?: number, walls: WallData[]) {
   const dx = wall.end.x - wall.start.x;
   const dy = wall.end.y - wall.start.y;
   const actualLength = length || getInteriorWallLength(wall);
@@ -27,11 +27,8 @@ function drawWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, offs
     y: wall.end.y - dirY * halfThickness
   };
   
-  // Determine which side to show measurement based on wall angle
-  let measurementSide = 1;
-  if (angle > -Math.PI/2 && angle < Math.PI/2) {
-    measurementSide = -1;
-  }
+  // Determine which side to show measurement based on wall position
+  const measurementSide = getMeasurementSide(wall, walls);
   
   // Calculate measurement line positions with adjusted offset
   const offsetX = Math.sin(angle) * offset * measurementSide;
@@ -125,6 +122,47 @@ function drawWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, offs
   ctx.fillText(measurement, 0, 0);
   
   ctx.restore();
+}
+
+// Helper function to determine measurement side for a wall
+function getMeasurementSide(wall: WallData, walls: WallData[]): number {
+  // For room boundary walls, place measurement on outside
+  if (isRoomBoundaryWall(wall, walls)) {
+    // Calculate center of room
+    let centerX = 0;
+    let centerY = 0;
+    let count = 0;
+    
+    walls.forEach(w => {
+      if (isRoomBoundaryWall(w, walls)) {
+        centerX += (w.start.x + w.end.x) / 2;
+        centerY += (w.start.y + w.end.y) / 2;
+        count++;
+      }
+    });
+    
+    centerX /= count;
+    centerY /= count;
+    
+    // Get wall midpoint
+    const midX = (wall.start.x + wall.end.x) / 2;
+    const midY = (wall.start.y + wall.end.y) / 2;
+    
+    // Vector from center to wall midpoint
+    const dx = midX - centerX;
+    const dy = midY - centerY;
+    
+    // Wall direction vector
+    const wallDx = wall.end.x - wall.start.x;
+    const wallDy = wall.end.y - wall.start.y;
+    
+    // Cross product to determine which side is outside
+    return Math.sign(dx * wallDy - dy * wallDx);
+  }
+  
+  // For other walls, use default side based on angle
+  const angle = Math.atan2(wall.end.y - wall.start.y, wall.end.x - wall.start.x);
+  return (angle > -Math.PI/2 && angle < Math.PI/2) ? -1 : 1;
 }
 
 // Calculate interior wall length (excluding wall thickness)
@@ -417,7 +455,7 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
     if (shouldShowWallMeasurement(wall, walls)) {
       const wallKey = `${wall.start.x},${wall.start.y}-${wall.end.x},${wall.end.y}`;
       const normalizedLength = normalizedMeasurements.get(wallKey);
-      drawWallMeasurement(ctx, wall, 25, normalizedLength);
+      drawWallMeasurement(ctx, wall, 25, normalizedLength, walls);
     }
   });
   
@@ -445,7 +483,7 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
           thickness: wall.thickness,
           controlPoints: []
         };
-        drawWallMeasurement(ctx, segmentWall, 25);
+        drawWallMeasurement(ctx, segmentWall, 25, undefined, walls);
       }
     }
   });
@@ -482,7 +520,7 @@ export function drawInProgressWall(ctx: CanvasRenderingContext2D, wall: WallData
   ctx.fill();
   
   // Draw measurement with offset
-  drawWallMeasurement(ctx, wall);
+  drawWallMeasurement(ctx, wall, 20, undefined, []);
 }
 
 // Draw measurements for wall segments
@@ -508,7 +546,7 @@ export function drawWallSegmentMeasurements(ctx: CanvasRenderingContext2D, walls
           thickness: wall.thickness,
           controlPoints: []
         };
-        drawWallMeasurement(ctx, segmentWall, 25);
+        drawWallMeasurement(ctx, segmentWall, 25, undefined, walls);
       }
     }
   });
