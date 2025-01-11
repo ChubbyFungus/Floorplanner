@@ -198,18 +198,22 @@ export function getDistance(p1: Point2D, p2: Point2D): number {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-// Find walls that connect to a given point
-export function findConnectedWalls(point: Point2D, walls: WallData[]): WallData[] {
-  return walls.filter(wall => 
-    arePointsEqual(wall.start, point) || arePointsEqual(wall.end, point)
-  );
-}
-
-// Check if a point is connected to any existing wall endpoint
-export function isConnectedToExistingWall(point: Point2D, walls: WallData[]): boolean {
-  return walls.some(wall => 
-    arePointsEqual(wall.start, point) || arePointsEqual(wall.end, point)
-  );
+// Find all walls connected to a point, including walls that contain the point along their length
+export function findAllConnectedWalls(point: Point2D, walls: WallData[]): WallData[] {
+  return walls.filter(wall => {
+    // Check endpoints
+    if (arePointsEqual(wall.start, point) || arePointsEqual(wall.end, point)) {
+      return true;
+    }
+    
+    // Check if point lies on the wall
+    if (!wall.controlPoints || wall.controlPoints.length === 0) {
+      const { distance } = getDistanceToLineSegment(point, wall.start, wall.end);
+      return distance <= POINT_TOLERANCE;
+    }
+    
+    return false;
+  });
 }
 
 // Check if the current wall would complete a shape
@@ -217,20 +221,19 @@ export function wouldCompleteShape(currentWall: WallData, existingWalls: WallDat
   // Need at least 2 existing walls to form a shape
   if (existingWalls.length < 2) return false;
 
-  // Find walls connected to the current wall's end point
-  const connectedToEnd = findConnectedWalls(currentWall.end, existingWalls);
-  if (connectedToEnd.length === 0) return false;
+  // Get all walls connected to start and end points
+  const connectedToStart = findAllConnectedWalls(currentWall.start, existingWalls);
+  const connectedToEnd = findAllConnectedWalls(currentWall.end, existingWalls);
 
-  // Find walls connected to the current wall's start point
-  const connectedToStart = findConnectedWalls(currentWall.start, existingWalls);
-  if (connectedToStart.length === 0) return false;
+  // If either point isn't connected to anything, can't form a shape
+  if (connectedToStart.length === 0 || connectedToEnd.length === 0) return false;
 
   // Try to trace a path from end to start
   const visited = new Set<string>();
   
   function canTracePathToStart(currentPoint: Point2D, targetPoint: Point2D, depth: number = 0): boolean {
     // Prevent infinite recursion
-    if (depth > existingWalls.length) return false;
+    if (depth > existingWalls.length * 2) return false;
     
     // Found path back to start
     if (arePointsEqual(currentPoint, targetPoint)) return true;
@@ -239,12 +242,24 @@ export function wouldCompleteShape(currentWall: WallData, existingWalls: WallDat
     if (visited.has(pointId)) return false;
     visited.add(pointId);
     
-    // Try all connected walls
-    const connectedWalls = findConnectedWalls(currentPoint, existingWalls);
+    // Get all connected walls at this point
+    const connectedWalls = findAllConnectedWalls(currentPoint, existingWalls);
+    
+    // For each connected wall, try both endpoints and points along the wall
     for (const wall of connectedWalls) {
-      const nextPoint = arePointsEqual(wall.start, currentPoint) ? wall.end : wall.start;
-      if (canTracePathToStart(nextPoint, targetPoint, depth + 1)) {
-        return true;
+      // Try wall endpoints
+      const endpoints = [wall.start, wall.end];
+      
+      // Also try points where other walls intersect this wall
+      const intersectionPoints = findWallIntersections(wall, existingWalls);
+      const allPoints = [...endpoints, ...intersectionPoints];
+      
+      for (const nextPoint of allPoints) {
+        if (!arePointsEqual(nextPoint, currentPoint) && !visited.has(pointKey(nextPoint))) {
+          if (canTracePathToStart(nextPoint, targetPoint, depth + 1)) {
+            return true;
+          }
+        }
       }
     }
     
@@ -253,13 +268,44 @@ export function wouldCompleteShape(currentWall: WallData, existingWalls: WallDat
 
   // Try to find a path from any connected end point back to start
   for (const wall of connectedToEnd) {
-    const nextPoint = arePointsEqual(wall.start, currentWall.end) ? wall.end : wall.start;
-    if (canTracePathToStart(nextPoint, currentWall.start, 0)) {
-      return true;
+    const points = [wall.start, wall.end];
+    const intersections = findWallIntersections(wall, existingWalls);
+    const allPoints = [...points, ...intersections];
+    
+    for (const nextPoint of allPoints) {
+      if (!arePointsEqual(nextPoint, currentWall.end)) {
+        visited.clear();
+        if (canTracePathToStart(nextPoint, currentWall.start, 0)) {
+          return true;
+        }
+      }
     }
   }
 
   return false;
+}
+
+// Find points where a wall intersects with other walls
+function findWallIntersections(wall: WallData, walls: WallData[]): Point2D[] {
+  const intersections: Point2D[] = [];
+  
+  for (const otherWall of walls) {
+    if (wall === otherWall) continue;
+    
+    // Skip curved walls for now
+    if (wall.controlPoints?.length || otherWall.controlPoints?.length) continue;
+    
+    // Check if any point of otherWall lies on wall
+    const points = [otherWall.start, otherWall.end];
+    for (const point of points) {
+      const { distance, nearestPoint } = getDistanceToLineSegment(point, wall.start, wall.end);
+      if (distance <= POINT_TOLERANCE) {
+        intersections.push(nearestPoint);
+      }
+    }
+  }
+  
+  return intersections;
 }
 
 // Get distance between a point and a line segment
