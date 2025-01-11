@@ -76,10 +76,10 @@ function findAllLoops(walls: WallData[]): WallData[][] {
         if (!revMatch) {
           break;
         } else {
-          reverseWall(revMatch);
-          currentLoop.push(revMatch);
+          const reversedWall = reverseWall(revMatch);
+          currentLoop.push(reversedWall);
           unused.delete(revMatch.id);
-          currentEnd = revMatch.end;
+          currentEnd = reversedWall.end;
         }
       } else {
         currentLoop.push(match);
@@ -96,13 +96,13 @@ function findAllLoops(walls: WallData[]): WallData[][] {
   return loops;
 }
 
-function reverseWall(wall: WallData) {
-  const tmp = wall.start;
-  wall.start = wall.end;
-  wall.end = tmp;
-  if (wall.controlPoints && wall.controlPoints.length > 0) {
-    wall.controlPoints.reverse();
-  }
+function reverseWall(wall: WallData): WallData {
+  return {
+    ...wall,
+    start: { ...wall.end },
+    end: { ...wall.start },
+    controlPoints: wall.controlPoints ? [...wall.controlPoints].reverse() : []
+  };
 }
 
 function pointKey(pt: Point2D): string {
@@ -221,27 +221,32 @@ export function wouldCompleteShape(currentWall: WallData, existingWalls: WallDat
     // Prevent infinite recursion
     if (depth > existingWalls.length) return false;
     
-    // Check if we've reached the target
+    // Found path back to start
     if (arePointsEqual(currentPoint, targetPoint)) return true;
-
-    // Find all connected walls we haven't visited yet
-    const connected = findConnectedWalls(currentPoint, existingWalls)
-      .filter(wall => !visited.has(wall.id));
-
-    // Try each connected wall
-    for (const wall of connected) {
-      visited.add(wall.id);
-      
-      // Try both endpoints of the wall
+    
+    const pointId = pointKey(currentPoint);
+    if (visited.has(pointId)) return false;
+    visited.add(pointId);
+    
+    // Try all connected walls
+    const connectedWalls = findConnectedWalls(currentPoint, existingWalls);
+    for (const wall of connectedWalls) {
       const nextPoint = arePointsEqual(wall.start, currentPoint) ? wall.end : wall.start;
       if (canTracePathToStart(nextPoint, targetPoint, depth + 1)) {
         return true;
       }
     }
-
+    
     return false;
   }
 
-  // Try to find a path from the end point back to the start point
-  return canTracePathToStart(currentWall.end, currentWall.start);
+  // Try to find a path from any connected end point back to start
+  for (const wall of connectedToEnd) {
+    const nextPoint = arePointsEqual(wall.start, currentWall.end) ? wall.end : wall.start;
+    if (canTracePathToStart(nextPoint, currentWall.start, 0)) {
+      return true;
+    }
+  }
+
+  return false;
 }
