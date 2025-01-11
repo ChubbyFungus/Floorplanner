@@ -469,20 +469,48 @@ function findAlignedBoundaryWalls(wall: WallData, walls: WallData[]): WallData[]
   const alignedWalls = [wall];
   const angle = Math.atan2(wall.end.y - wall.start.y, wall.end.x - wall.start.x);
   
-  for (const otherWall of walls) {
-    if (otherWall === wall) continue;
+  // First pass: find all walls that are aligned (same angle)
+  const potentialAligned = walls.filter(w => {
+    if (w === wall) return false;
     
-    const otherAngle = Math.atan2(otherWall.end.y - otherWall.start.y, otherWall.end.x - otherWall.start.x);
-    if (Math.abs(angle - otherAngle) < 0.1 || Math.abs(Math.abs(angle - otherAngle) - Math.PI) < 0.1) {
-      // Check if walls are close to each other
-      const dist = getParallelWallDistance(wall, otherWall);
-      if (dist < wall.thickness * 2) {
-        alignedWalls.push(otherWall);
-      }
+    const otherAngle = Math.atan2(w.end.y - w.start.y, w.end.x - w.start.x);
+    return Math.abs(angle - otherAngle) < 0.1 || Math.abs(Math.abs(angle - otherAngle) - Math.PI) < 0.1;
+  });
+  
+  // Sort walls by their position along the main axis
+  const isHorizontal = Math.abs(angle) < Math.PI/4 || Math.abs(angle) > 3*Math.PI/4;
+  const sortedWalls = [wall, ...potentialAligned].sort((a, b) => {
+    if (isHorizontal) {
+      return Math.min(a.start.x, a.end.x) - Math.min(b.start.x, b.end.x);
+    } else {
+      return Math.min(a.start.y, a.end.y) - Math.min(b.start.y, b.end.y);
+    }
+  });
+  
+  // Find continuous segments
+  let currentSegment = [sortedWalls[0]];
+  const allSegments = [currentSegment];
+  
+  for (let i = 1; i < sortedWalls.length; i++) {
+    const currentWall = sortedWalls[i];
+    const prevWall = sortedWalls[i-1];
+    
+    // Check if walls are connected or very close
+    const gap = isHorizontal ? 
+      Math.abs(Math.max(prevWall.start.x, prevWall.end.x) - Math.min(currentWall.start.x, currentWall.end.x)) :
+      Math.abs(Math.max(prevWall.start.y, prevWall.end.y) - Math.min(currentWall.start.y, currentWall.end.y));
+    
+    if (gap <= wall.thickness * 2) {
+      currentSegment.push(currentWall);
+    } else {
+      currentSegment = [currentWall];
+      allSegments.push(currentSegment);
     }
   }
   
-  return alignedWalls;
+  // Find the segment containing our wall
+  const targetSegment = allSegments.find(segment => segment.includes(wall));
+  return targetSegment || [wall];
 }
 
 // Helper function to get the combined wall length and endpoints
@@ -503,16 +531,19 @@ function getCombinedWallInfo(walls: WallData[]): { start: Point2D; end: Point2D;
     maxY = Math.max(maxY, wall.start.y, wall.end.y);
   });
   
-  // Determine if wall is more horizontal or vertical
-  const isHorizontal = (maxX - minX) > (maxY - minY);
+  // Get the primary direction of the walls
+  const firstWall = walls[0];
+  const angle = Math.atan2(firstWall.end.y - firstWall.start.y, firstWall.end.x - firstWall.start.x);
+  const isHorizontal = Math.abs(angle) < Math.PI/4 || Math.abs(angle) > 3*Math.PI/4;
   
+  // Use the first wall's position in the secondary axis
   const start = isHorizontal ? 
-    { x: minX, y: walls[0].start.y } :
-    { x: walls[0].start.x, y: minY };
+    { x: minX, y: firstWall.start.y } :
+    { x: firstWall.start.x, y: minY };
   
   const end = isHorizontal ?
-    { x: maxX, y: walls[0].end.y } :
-    { x: walls[0].end.x, y: maxY };
+    { x: maxX, y: firstWall.end.y } :
+    { x: firstWall.end.x, y: maxY };
   
   return {
     start,
