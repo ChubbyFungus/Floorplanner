@@ -200,11 +200,10 @@ export const FloorPlanner2D: React.FC = () => {
     if (!canvasRef.current) return;
 
     const point = getMousePosition(e);
-    console.log('Canvas clicked:', { point, selectedTool, wallInProgress });
+    console.log('Canvas clicked:', { point, selectedTool, wallInProgress, wallCount: walls.length });
 
     if (selectedTool === 'wall') {
       console.log('Wall tool active');
-      console.log(`Selected tool: ${selectedTool} (Wall tool)`);
       if (wallInProgress) {
         console.log('Wall in progress');
         if (isAltPressed) {
@@ -237,16 +236,9 @@ export const FloorPlanner2D: React.FC = () => {
           }
         }
       } else {
-        console.log('Starting new wall', { point, walls });
-        if (walls.length === 0) {
-          console.log('First wall - starting at any point');
-          dispatch(startWall(point));
-        } else if (isConnectedToExistingWall(point, walls)) {
-          console.log('Connected to existing wall - starting new wall');
-          dispatch(startWall(point));
-        } else {
-          console.log('Point not connected to existing wall');
-        }
+        // Always allow placing the first wall
+        dispatch(startWall(point));
+        console.log('Started new wall at:', point);
       }
     } else if (selectedTool === 'room') {
       console.log(`Selected tool: ${selectedTool} (Room tool)`);
