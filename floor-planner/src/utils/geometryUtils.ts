@@ -1,5 +1,12 @@
-import { WallData, FixtureData, Point2D } from "../types";
+import { Point2D, WallData, FixtureData } from "../types";
 import earcut from "earcut";
+
+// Constants for unit conversion
+const PIXELS_PER_FOOT = 50;  // 50 pixels = 1 foot
+const PIXELS_PER_INCH = PIXELS_PER_FOOT / 12;  // pixels per inch
+
+// Tolerance for considering points as equal (in pixels)
+const POINT_TOLERANCE = 10; // Increased tolerance to account for DPI scaling
 
 interface CalcResult {
   totalArea: number;
@@ -155,11 +162,6 @@ function triangleArea(arr: number[], i0: number, i1: number, i2: number): number
   ) / 2;
 }
 
-// Constants for unit conversion
-import { Point2D, WallData } from "../types";
-const PIXELS_PER_FOOT = 50;  // 50 pixels = 1 foot
-const PIXELS_PER_INCH = PIXELS_PER_FOOT / 12;  // pixels per inch
-
 export function pixelsToFeetAndInches(pixels: number): string {
   const totalInches = pixels / PIXELS_PER_INCH;
   const feet = Math.floor(totalInches / 12);
@@ -177,9 +179,6 @@ export function pixelsToFeetAndInches(pixels: number): string {
 export function feetAndInchesToPixels(feet: number, inches: number = 0): number {
   return (feet * PIXELS_PER_FOOT) + (inches * PIXELS_PER_INCH);
 }
-
-// Tolerance for considering points as equal (in pixels)
-const POINT_TOLERANCE = 10; // Increased tolerance to account for DPI scaling
 
 // Check if two points are effectively the same within a tolerance
 export function arePointsEqual(p1: Point2D, p2: Point2D): boolean {
