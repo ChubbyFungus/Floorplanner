@@ -2,7 +2,7 @@ import { Point2D, WallData, FixtureData } from "../types";
 import earcut from "earcut";
 
 // Constants for unit conversion
-export const PIXELS_PER_FOOT = 50;  // 50 pixels = 1 foot
+export const PIXELS_PER_FOOT = 25;  // 25 pixels = 1 foot (reduced from 50 for more space)
 export const PIXELS_PER_INCH = PIXELS_PER_FOOT / 12;  // pixels per inch
 
 // Constants for geometry calculations
@@ -202,8 +202,6 @@ function triangleArea(arr: number[], i0: number, i1: number, i2: number): number
 }
 
 export function pixelsToFeetAndInches(pixels: number): string {
-  const PIXELS_PER_FOOT = 20; // Adjust this value based on your scale
-  
   const totalInches = (pixels / PIXELS_PER_FOOT) * 12;
   const feet = Math.floor(totalInches / 12);
   const inches = Math.round(totalInches % 12);
