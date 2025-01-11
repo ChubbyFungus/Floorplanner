@@ -313,6 +313,67 @@ function findParallelWalls(walls: WallData[]): Map<string, WallData[]> {
   return parallelGroups;
 }
 
+function isHorizontal(wall: WallData): boolean {
+  const dy = Math.abs(wall.end.y - wall.start.y);
+  return dy < 1; // Consider wall horizontal if vertical difference is less than 1 pixel
+}
+
+function isVertical(wall: WallData): boolean {
+  const dx = Math.abs(wall.end.x - wall.start.x);
+  return dx < 1; // Consider wall vertical if horizontal difference is less than 1 pixel
+}
+
+function getWallsAtHeight(walls: WallData[], y: number, tolerance: number = 1): WallData[] {
+  return walls.filter(wall => 
+    Math.abs(wall.start.y - y) < tolerance || 
+    Math.abs(wall.end.y - y) < tolerance
+  );
+}
+
+function getWallsAtX(walls: WallData[], x: number, tolerance: number = 1): WallData[] {
+  return walls.filter(wall => 
+    Math.abs(wall.start.x - x) < tolerance || 
+    Math.abs(wall.end.x - x) < tolerance
+  );
+}
+
+function findUniqueWallGroups(walls: WallData[]): WallData[][] {
+  const groups: WallData[][] = [];
+  const processedWalls = new Set<string>();
+
+  walls.forEach(wall1 => {
+    if (!processedWalls.has(wall1.id)) {
+      const isWall1Horizontal = isHorizontal(wall1);
+      const wall1Length = getWallLength(wall1);
+      const group = walls.filter(wall2 => {
+        if (processedWalls.has(wall2.id)) return false;
+        
+        const isWall2Horizontal = isHorizontal(wall2);
+        const wall2Length = getWallLength(wall2);
+        
+        // Group walls if they:
+        // 1. Have the same orientation (both horizontal or both vertical)
+        // 2. Have the same length (within 1 pixel)
+        // 3. Are at the same height (for horizontal) or x-position (for vertical)
+        return (
+          isWall1Horizontal === isWall2Horizontal &&
+          Math.abs(wall1Length - wall2Length) < 1 &&
+          (isWall1Horizontal 
+            ? Math.abs(wall1.start.y - wall2.start.y) < 1
+            : Math.abs(wall1.start.x - wall2.start.x) < 1)
+        );
+      });
+
+      group.forEach(w => processedWalls.add(w.id));
+      if (group.length > 0) {
+        groups.push([wall1, ...group]);
+      }
+    }
+  });
+
+  return groups;
+}
+
 export function drawWalls(
   ctx: CanvasRenderingContext2D, 
   walls: WallData[],
@@ -355,13 +416,16 @@ export function drawWalls(
 
   // Draw measurements if enabled
   if (showMeasurements) {
-    const parallelGroups = findParallelWalls(walls);
+    const wallGroups = findUniqueWallGroups(walls);
     
-    parallelGroups.forEach((group, length) => {
-      // Only draw measurement for one wall in each parallel group
+    wallGroups.forEach(group => {
+      // Only draw measurement for the first wall in each group
       const wall = group[0];
-      const length = getWallLength(wall);
-      drawWallMeasurement(ctx, wall, -25, length);
+      const wallLength = getWallLength(wall);
+      
+      // Draw measurement slightly above horizontal walls and to the left of vertical walls
+      const offset = isHorizontal(wall) ? -25 : -40;
+      drawWallMeasurement(ctx, wall, offset, wallLength);
     });
   }
 }
