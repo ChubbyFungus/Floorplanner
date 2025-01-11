@@ -16,7 +16,7 @@ import {
 } from "../../store/slices/floorPlannerSlice";
 import { createRectangularRoom } from "../../store/slices/roomToolSlice";
 import { v4 as uuidv4 } from "uuid";
-import { drawWalls, drawInProgressWall, drawWallSegmentMeasurements } from "./drawing";
+import { drawWalls, drawInProgressWall, drawWallSegmentMeasurements, drawRoomPreview } from "./drawing";
 import { 
   wouldCompleteShape, 
   isConnectedToExistingWall, 
@@ -88,33 +88,7 @@ export const FloorPlanner2D: React.FC = () => {
 
     // Draw room preview
     if (roomStart && selectedTool === 'room') {
-      ctx.strokeStyle = '#4a90e2';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      ctx.beginPath();
-      ctx.moveTo(roomStart.x, roomStart.y);
-      const width = mousePos.x - roomStart.x;
-      const height = mousePos.y - roomStart.y;
-      ctx.rect(roomStart.x, roomStart.y, width, height);
-      ctx.stroke();
-
-      // Draw room dimensions
-      ctx.font = '14px Arial';
-      ctx.fillStyle = '#333';
-      ctx.textAlign = 'center';
-      ctx.setLineDash([]);
-
-      // Width
-      const midX = roomStart.x + width / 2;
-      const midY = roomStart.y + height / 2;
-      ctx.fillText(`${Math.abs(Math.round(width))}px`, midX, roomStart.y - 10);
-
-      // Height
-      ctx.save();
-      ctx.translate(roomStart.x - 10, midY);
-      ctx.rotate(-Math.PI / 2);
-      ctx.fillText(`${Math.abs(Math.round(height))}px`, 0, 0);
-      ctx.restore();
+      drawRoomPreview(ctx, roomStart, mousePos);
     }
 
     ctx.restore();
