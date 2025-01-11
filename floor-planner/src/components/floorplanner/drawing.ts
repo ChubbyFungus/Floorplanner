@@ -382,102 +382,38 @@ function arePointsEqual(p1: Point2D, p2: Point2D): boolean {
 
 // Helper function to check if a wall is part of a room boundary
 function isRoomBoundaryWall(wall: WallData, walls: WallData[]): boolean {
-  // For now, consider any wall that has perpendicular connections at both ends as a boundary
-  const connectedWalls = walls.filter(w => {
-    if (w === wall) return false;
-    
-    // Check if wall connects at either end
-    const connectsAtStart = arePointsEqual(w.start, wall.start) || arePointsEqual(w.end, wall.start);
-    const connectsAtEnd = arePointsEqual(w.start, wall.end) || arePointsEqual(w.end, wall.end);
-    
-    if (!connectsAtStart && !connectsAtEnd) return false;
-    
-    // Check if it's roughly perpendicular
-    const angle = getWallAngle(wall, w);
-    return Math.abs(angle - Math.PI/2) < 0.1;
-  });
+  console.log("\nChecking if wall is boundary:", wall.id);
   
-  // Count perpendicular connections at each end
-  const startConnections = connectedWalls.filter(w => 
-    arePointsEqual(w.start, wall.start) || arePointsEqual(w.end, wall.start)
-  ).length;
-  
-  const endConnections = connectedWalls.filter(w => 
-    arePointsEqual(w.start, wall.end) || arePointsEqual(w.end, wall.end)
-  ).length;
-  
-  // It's a boundary wall if it has at least one perpendicular connection
-  return startConnections > 0 || endConnections > 0;
-}
-
-// Helper function to determine if a wall should show measurements
-function shouldShowWallMeasurement(wall: WallData, walls: WallData[]): boolean {
-  // For simple rectangles, always show measurements
-  if (walls.length <= 4) return true;
-  
-  // For more complex layouts, use boundary detection
-  if (isRoomBoundaryWall(wall, walls)) {
-    const length = getDistance(wall.start, wall.end);
-    if (length < 36) return false; // Skip very small walls (less than 3 feet)
-    
-    // Skip walls that are part of a larger aligned wall
-    for (const otherWall of walls) {
-      if (wall === otherWall) continue;
-      
-      // Check if walls are aligned (same line)
-      const angle = getWallAngle(wall, otherWall);
-      if (angle < 0.1 || Math.abs(angle - Math.PI) < 0.1) {
-        // Check if walls are close to each other
-        const dist = getParallelWallDistance(wall, otherWall);
-        if (dist < wall.thickness * 2) {
-          // Check if this wall is shorter
-          const otherLength = getDistance(otherWall.start, otherWall.end);
-          if (length < otherLength) return false;
-        }
-      }
-    }
-    
-    return true;
-  }
-  
-  return false; // Don't show measurements for non-boundary walls
-}
-
-// Helper function to check if a wall intersection should split the measurement
-function shouldSplitAtIntersection(wall: WallData, intersection: Point2D, walls: WallData[]): boolean {
-  // Find walls that connect at this intersection
+  // Get connecting walls
   const connectingWalls = walls.filter(w => {
     if (w === wall) return false;
-    return arePointsEqual(w.start, intersection) || arePointsEqual(w.end, intersection);
+    return (
+      pointsAreClose(w.start, wall.start) ||
+      pointsAreClose(w.start, wall.end) ||
+      pointsAreClose(w.end, wall.start) ||
+      pointsAreClose(w.end, wall.end)
+    );
   });
   
-  // Don't split if there's only one connecting wall
-  if (connectingWalls.length === 1) {
-    const connectingWall = connectingWalls[0];
-    
-    // Don't split if the connecting wall is small (like a doorway)
-    const connectingLength = getDistance(connectingWall.start, connectingWall.end);
-    if (connectingLength < 60) return false;
-    
-    // Don't split if the connecting wall is perpendicular
-    const angle = getWallAngle(wall, connectingWall);
-    if (Math.abs(angle - Math.PI/2) < 0.1) return false;
-  }
+  console.log("Found connecting walls:", connectingWalls.map(w => w.id));
   
-  // Split only if there are multiple significant connecting walls
-  return connectingWalls.length > 1 && 
-         connectingWalls.some(w => getDistance(w.start, w.end) >= 60);
+  // For now, consider any wall with perpendicular connections as a boundary
+  return connectingWalls.some(otherWall => {
+    const angle = getAngleBetweenWalls(wall, otherWall);
+    const isPerpendicular = Math.abs(angle - Math.PI/2) < 0.1 || Math.abs(angle - 3*Math.PI/2) < 0.1;
+    console.log(`Angle between ${wall.id} and ${otherWall.id}:`, angle, "isPerpendicular:", isPerpendicular);
+    return isPerpendicular;
+  });
 }
 
 // Helper function to find aligned walls that form a continuous boundary
 function findAlignedBoundaryWalls(wall: WallData, walls: WallData[]): WallData[] {
   console.log("\nFinding aligned walls for:", wall.id);
   
-  const alignedWalls = [wall];
+  // First pass: find all walls that are aligned (same angle)
   const angle = Math.atan2(wall.end.y - wall.start.y, wall.end.x - wall.start.x);
   console.log("Wall angle:", angle);
   
-  // First pass: find all walls that are aligned (same angle)
   const potentialAligned = walls.filter(w => {
     if (w === wall) return false;
     
@@ -533,45 +469,6 @@ function findAlignedBoundaryWalls(wall: WallData, walls: WallData[]): WallData[]
   console.log("Final segment walls:", targetSegment.map(w => w.id));
   
   return targetSegment || [wall];
-}
-
-// Helper function to get the combined wall length and endpoints
-function getCombinedWallInfo(walls: WallData[]): { start: Point2D; end: Point2D; length: number } {
-  if (walls.length === 0) return null;
-  if (walls.length === 1) return {
-    start: walls[0].start,
-    end: walls[0].end,
-    length: getDistance(walls[0].start, walls[0].end)
-  };
-  
-  // Find the extreme points
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  walls.forEach(wall => {
-    minX = Math.min(minX, wall.start.x, wall.end.x);
-    minY = Math.min(minY, wall.start.y, wall.end.y);
-    maxX = Math.max(maxX, wall.start.x, wall.end.x);
-    maxY = Math.max(maxY, wall.start.y, wall.end.y);
-  });
-  
-  // Get the primary direction of the walls
-  const firstWall = walls[0];
-  const angle = Math.atan2(firstWall.end.y - firstWall.start.y, firstWall.end.x - firstWall.start.x);
-  const isHorizontal = Math.abs(angle) < Math.PI/4 || Math.abs(angle) > 3*Math.PI/4;
-  
-  // Use the first wall's position in the secondary axis
-  const start = isHorizontal ? 
-    { x: minX, y: firstWall.start.y } :
-    { x: firstWall.start.x, y: minY };
-  
-  const end = isHorizontal ?
-    { x: maxX, y: firstWall.end.y } :
-    { x: firstWall.end.x, y: maxY };
-  
-  return {
-    start,
-    end,
-    length: getDistance(start, end)
-  };
 }
 
 export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
@@ -710,4 +607,63 @@ export function drawWallSegmentMeasurements(ctx: CanvasRenderingContext2D, walls
       }
     }
   });
+}
+
+// Helper function to get the combined wall length and endpoints
+function getCombinedWallInfo(walls: WallData[]): { start: Point2D; end: Point2D; length: number } {
+  if (walls.length === 0) return null;
+  if (walls.length === 1) return {
+    start: walls[0].start,
+    end: walls[0].end,
+    length: getDistance(walls[0].start, walls[0].end)
+  };
+  
+  // Find the extreme points
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  walls.forEach(wall => {
+    minX = Math.min(minX, wall.start.x, wall.end.x);
+    minY = Math.min(minY, wall.start.y, wall.end.y);
+    maxX = Math.max(maxX, wall.start.x, wall.end.x);
+    maxY = Math.max(maxY, wall.start.y, wall.end.y);
+  });
+  
+  // Get the primary direction of the walls
+  const firstWall = walls[0];
+  const angle = Math.atan2(firstWall.end.y - firstWall.start.y, firstWall.end.x - firstWall.start.x);
+  const isHorizontal = Math.abs(angle) < Math.PI/4 || Math.abs(angle) > 3*Math.PI/4;
+  
+  // Use the first wall's position in the secondary axis
+  const start = isHorizontal ? 
+    { x: minX, y: firstWall.start.y } :
+    { x: firstWall.start.x, y: minY };
+  
+  const end = isHorizontal ?
+    { x: maxX, y: firstWall.end.y } :
+    { x: firstWall.end.x, y: maxY };
+  
+  return {
+    start,
+    end,
+    length: getDistance(start, end)
+  };
+}
+
+// Helper function to check if two points are close
+function pointsAreClose(p1: Point2D, p2: Point2D): boolean {
+  return Math.abs(p1.x - p2.x) < 10 && Math.abs(p1.y - p2.y) < 10;
+}
+
+// Helper function to get the angle between two walls
+function getAngleBetweenWalls(wall1: WallData, wall2: WallData): number {
+  const dx1 = wall1.end.x - wall1.start.x;
+  const dy1 = wall1.end.y - wall1.start.y;
+  const dx2 = wall2.end.x - wall2.start.x;
+  const dy2 = wall2.end.y - wall2.start.y;
+  
+  const angle1 = Math.atan2(dy1, dx1);
+  const angle2 = Math.atan2(dy2, dx2);
+  
+  let diff = Math.abs(angle1 - angle2);
+  if (diff > Math.PI) diff = 2 * Math.PI - diff;
+  return diff;
 }
