@@ -124,6 +124,11 @@ function drawWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, offs
   ctx.restore();
 }
 
+// Debug logging
+function logWallInfo(prefix: string, wall: WallData) {
+  console.log(`${prefix} - id: ${wall.id}, start: (${wall.start.x}, ${wall.start.y}), end: (${wall.end.x}, ${wall.end.y})`);
+}
+
 // Helper function to determine measurement side for a wall
 function getMeasurementSide(wall: WallData, walls: WallData[]): number {
   // For room boundary walls, place measurement on outside
@@ -466,19 +471,28 @@ function shouldSplitAtIntersection(wall: WallData, intersection: Point2D, walls:
 
 // Helper function to find aligned walls that form a continuous boundary
 function findAlignedBoundaryWalls(wall: WallData, walls: WallData[]): WallData[] {
+  console.log("\nFinding aligned walls for:", wall.id);
+  
   const alignedWalls = [wall];
   const angle = Math.atan2(wall.end.y - wall.start.y, wall.end.x - wall.start.x);
+  console.log("Wall angle:", angle);
   
   // First pass: find all walls that are aligned (same angle)
   const potentialAligned = walls.filter(w => {
     if (w === wall) return false;
     
     const otherAngle = Math.atan2(w.end.y - w.start.y, w.end.x - w.start.x);
-    return Math.abs(angle - otherAngle) < 0.1 || Math.abs(Math.abs(angle - otherAngle) - Math.PI) < 0.1;
+    const aligned = Math.abs(angle - otherAngle) < 0.1 || Math.abs(Math.abs(angle - otherAngle) - Math.PI) < 0.1;
+    if (aligned) {
+      console.log("Found aligned wall:", w.id);
+    }
+    return aligned;
   });
   
   // Sort walls by their position along the main axis
   const isHorizontal = Math.abs(angle) < Math.PI/4 || Math.abs(angle) > 3*Math.PI/4;
+  console.log("Is horizontal:", isHorizontal);
+  
   const sortedWalls = [wall, ...potentialAligned].sort((a, b) => {
     if (isHorizontal) {
       return Math.min(a.start.x, a.end.x) - Math.min(b.start.x, b.end.x);
@@ -486,6 +500,8 @@ function findAlignedBoundaryWalls(wall: WallData, walls: WallData[]): WallData[]
       return Math.min(a.start.y, a.end.y) - Math.min(b.start.y, b.end.y);
     }
   });
+  
+  console.log("Sorted walls:", sortedWalls.map(w => w.id));
   
   // Find continuous segments
   let currentSegment = [sortedWalls[0]];
@@ -500,16 +516,22 @@ function findAlignedBoundaryWalls(wall: WallData, walls: WallData[]): WallData[]
       Math.abs(Math.max(prevWall.start.x, prevWall.end.x) - Math.min(currentWall.start.x, currentWall.end.x)) :
       Math.abs(Math.max(prevWall.start.y, prevWall.end.y) - Math.min(currentWall.start.y, currentWall.end.y));
     
+    console.log(`Gap between ${prevWall.id} and ${currentWall.id}:`, gap);
+    
     if (gap <= wall.thickness * 2) {
       currentSegment.push(currentWall);
+      console.log(`Added ${currentWall.id} to current segment`);
     } else {
       currentSegment = [currentWall];
       allSegments.push(currentSegment);
+      console.log(`Started new segment with ${currentWall.id}`);
     }
   }
   
   // Find the segment containing our wall
   const targetSegment = allSegments.find(segment => segment.includes(wall));
+  console.log("Final segment walls:", targetSegment.map(w => w.id));
+  
   return targetSegment || [wall];
 }
 
@@ -553,6 +575,8 @@ function getCombinedWallInfo(walls: WallData[]): { start: Point2D; end: Point2D;
 }
 
 export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
+  console.log("\nDrawing walls:", walls.map(w => w.id));
+  
   // First draw all walls
   walls.forEach(wall => {
     ctx.beginPath();
@@ -571,15 +595,26 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
   });
   
   // Then draw measurements
-  const processedWalls = new Set<WallData>();
+  const processedWalls = new Set<string>();
   
   // First draw boundary measurements
   walls.forEach(wall => {
-    if (processedWalls.has(wall)) return;
-    if (!isRoomBoundaryWall(wall, walls)) return;
+    if (processedWalls.has(wall.id)) {
+      console.log(`Skipping processed wall: ${wall.id}`);
+      return;
+    }
+    
+    if (!isRoomBoundaryWall(wall, walls)) {
+      console.log(`Not a boundary wall: ${wall.id}`);
+      return;
+    }
+    
+    console.log(`Processing boundary wall: ${wall.id}`);
     
     // Find all aligned walls that form this boundary
     const alignedWalls = findAlignedBoundaryWalls(wall, walls);
+    console.log(`Found ${alignedWalls.length} aligned walls:`, alignedWalls.map(w => w.id));
+    
     const combinedInfo = getCombinedWallInfo(alignedWalls);
     
     // Create a temporary wall for the full boundary measurement
@@ -595,12 +630,16 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
     drawWallMeasurement(ctx, boundaryWall, 25, combinedInfo.length, walls);
     
     // Mark all these walls as processed
-    alignedWalls.forEach(w => processedWalls.add(w));
+    alignedWalls.forEach(w => {
+      processedWalls.add(w.id);
+      console.log(`Marked as processed: ${w.id}`);
+    });
   });
   
   // Then draw interior measurements
   walls.forEach(wall => {
-    if (!processedWalls.has(wall)) {
+    if (!processedWalls.has(wall.id)) {
+      console.log(`Drawing interior measurement for: ${wall.id}`);
       const length = getDistance(wall.start, wall.end);
       if (length >= 36) { // Only show interior measurements for walls >= 3 feet
         // Draw interior measurement
