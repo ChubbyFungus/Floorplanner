@@ -5,39 +5,61 @@ import { pixelsToFeetAndInches } from "../../utils/geometryUtils";
 const POINT_TOLERANCE = 1e-6;
 
 // Helper function to draw wall measurement
-function drawWallMeasurement(ctx: CanvasRenderingContext2D, start: Point2D, end: Point2D, offset: number = 20) {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const length = Math.sqrt(dx * dx + dy * dy);
+function drawWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, offset: number = 20, length?: number) {
+  const dx = wall.end.x - wall.start.x;
+  const dy = wall.end.y - wall.start.y;
+  const actualLength = length || getInteriorWallLength(wall);
   const angle = Math.atan2(dy, dx);
   
-  // Calculate measurement line positions
-  const offsetX = -Math.sin(angle) * offset;
-  const offsetY = Math.cos(angle) * offset;
+  // Calculate wall direction unit vector
+  const wallLength = Math.sqrt(dx * dx + dy * dy);
+  const dirX = dx / wallLength;
+  const dirY = dy / wallLength;
   
-  const startOffsetX = start.x + offsetX;
-  const startOffsetY = start.y + offsetY;
-  const endOffsetX = end.x + offsetX;
-  const endOffsetY = end.y + offsetY;
+  // Adjust start and end points to account for wall thickness
+  const halfThickness = wall.thickness / 2;
+  const adjustedStart = {
+    x: wall.start.x + dirX * halfThickness,
+    y: wall.start.y + dirY * halfThickness
+  };
+  const adjustedEnd = {
+    x: wall.end.x - dirX * halfThickness,
+    y: wall.end.y - dirY * halfThickness
+  };
+  
+  // Determine which side to show measurement based on wall angle
+  let measurementSide = 1;
+  if (angle > -Math.PI/2 && angle < Math.PI/2) {
+    measurementSide = -1;
+  }
+  
+  // Calculate measurement line positions with adjusted offset
+  const offsetX = Math.sin(angle) * offset * measurementSide;
+  const offsetY = -Math.cos(angle) * offset * measurementSide;
+  
+  const startOffsetX = adjustedStart.x + offsetX;
+  const startOffsetY = adjustedStart.y + offsetY;
+  const endOffsetX = adjustedEnd.x + offsetX;
+  const endOffsetY = adjustedEnd.y + offsetY;
   
   // Draw extension lines
   ctx.beginPath();
-  ctx.moveTo(start.x, start.y);
+  ctx.moveTo(adjustedStart.x, adjustedStart.y);
   ctx.lineTo(startOffsetX, startOffsetY);
-  ctx.moveTo(end.x, end.y);
+  ctx.moveTo(adjustedEnd.x, adjustedEnd.y);
   ctx.lineTo(endOffsetX, endOffsetY);
   ctx.strokeStyle = '#666666';
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 0.5;
   ctx.stroke();
   
-  // Draw measurement line with arrows
+  // Draw measurement line
   ctx.beginPath();
   ctx.moveTo(startOffsetX, startOffsetY);
   ctx.lineTo(endOffsetX, endOffsetY);
   ctx.stroke();
   
   // Draw arrows
-  const arrowSize = 6;
+  const arrowSize = 5;
   const arrowAngle = Math.PI / 6; // 30 degrees
   
   // Start arrow
@@ -71,29 +93,29 @@ function drawWallMeasurement(ctx: CanvasRenderingContext2D, start: Point2D, end:
   // Draw measurement text
   const midX = (startOffsetX + endOffsetX) / 2;
   const midY = (startOffsetY + endOffsetY) / 2;
-  const measurement = pixelsToFeetAndInches(length);
+  const measurement = pixelsToFeetAndInches(actualLength);
   
   ctx.save();
   ctx.translate(midX, midY);
   
-  // Rotate text to match wall angle, but keep it readable
+  // Keep text upright
   let textAngle = angle;
-  if (angle > Math.PI / 2 || angle < -Math.PI / 2) {
+  if (angle > Math.PI/2 || angle < -Math.PI/2) {
     textAngle += Math.PI;
   }
   ctx.rotate(textAngle);
   
   // Draw white background for text
-  ctx.font = '12px Arial';
+  ctx.font = '10px Arial';
   const textMetrics = ctx.measureText(measurement);
   const padding = 2;
   
   ctx.fillStyle = 'white';
   ctx.fillRect(
     -textMetrics.width / 2 - padding,
-    -8 - padding,
+    -6 - padding,
     textMetrics.width + 2 * padding,
-    16 + 2 * padding
+    12 + 2 * padding
   );
   
   // Draw text
@@ -103,6 +125,42 @@ function drawWallMeasurement(ctx: CanvasRenderingContext2D, start: Point2D, end:
   ctx.fillText(measurement, 0, 0);
   
   ctx.restore();
+}
+
+// Calculate interior wall length (excluding wall thickness)
+function getInteriorWallLength(wall: WallData): number {
+  const totalLength = getDistance(wall.start, wall.end);
+  return Math.max(0, totalLength - wall.thickness);
+}
+
+// Helper function to normalize measurements for parallel walls
+function normalizeParallelMeasurements(walls: WallData[]): Map<string, number> {
+  const measurements = new Map<string, number>();
+  
+  for (let i = 0; i < walls.length; i++) {
+    for (let j = i + 1; j < walls.length; j++) {
+      const wall1 = walls[i];
+      const wall2 = walls[j];
+      
+      if (areWallsParallel(wall1, wall2)) {
+        const dist = getParallelWallDistance(wall1, wall2);
+        if (dist > 200) continue; // Skip if walls are too far apart
+        
+        const length1 = getInteriorWallLength(wall1);
+        const length2 = getInteriorWallLength(wall2);
+        
+        // Use the average length for both walls
+        const avgLength = (length1 + length2) / 2;
+        const key1 = `${wall1.start.x},${wall1.start.y}-${wall1.end.x},${wall1.end.y}`;
+        const key2 = `${wall2.start.x},${wall2.start.y}-${wall2.end.x},${wall2.end.y}`;
+        
+        measurements.set(key1, avgLength);
+        measurements.set(key2, avgLength);
+      }
+    }
+  }
+  
+  return measurements;
 }
 
 // Helper function to find wall intersections
@@ -275,24 +333,15 @@ function doSpansOverlap(span1: { min: number; max: number }, span2: { min: numbe
 }
 
 export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
+  // First normalize measurements for parallel walls
+  const normalizedMeasurements = normalizeParallelMeasurements(walls);
+  
   // Draw walls
   walls.forEach(wall => {
+    // Draw the wall
     ctx.beginPath();
     ctx.moveTo(wall.start.x, wall.start.y);
-    
-    if (wall.controlPoints && wall.controlPoints.length > 0) {
-      // Draw curved wall
-      ctx.quadraticCurveTo(
-        wall.controlPoints[0].x,
-        wall.controlPoints[0].y,
-        wall.end.x,
-        wall.end.y
-      );
-    } else {
-      // Draw straight wall
-      ctx.lineTo(wall.end.x, wall.end.y);
-    }
-    
+    ctx.lineTo(wall.end.x, wall.end.y);
     ctx.lineWidth = wall.thickness;
     ctx.strokeStyle = '#000000';
     ctx.stroke();
@@ -304,8 +353,12 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
     ctx.fillStyle = '#0000ff';
     ctx.fill();
     
-    // Draw measurement with offset
-    drawWallMeasurement(ctx, wall.start, wall.end);
+    // Get normalized measurement if available
+    const wallKey = `${wall.start.x},${wall.start.y}-${wall.end.x},${wall.end.y}`;
+    const normalizedLength = normalizedMeasurements.get(wallKey);
+    
+    // Draw measurement with normalized length if available
+    drawWallMeasurement(ctx, wall, 25, normalizedLength);
   });
 }
 
@@ -340,7 +393,7 @@ export function drawInProgressWall(ctx: CanvasRenderingContext2D, wall: WallData
   ctx.fill();
   
   // Draw measurement with offset
-  drawWallMeasurement(ctx, wall.start, wall.end);
+  drawWallMeasurement(ctx, wall);
 }
 
 // Draw measurements for wall segments
