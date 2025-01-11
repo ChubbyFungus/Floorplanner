@@ -163,18 +163,21 @@ function subdivideWall(wall: WallData): Point2D[] {
 
 function polygonArea(points: Point2D[]): number {
   if (points.length < 3) return 0;
-  const flattened: number[] = [];
-  for (const p of points) {
-    flattened.push(p.x, p.y);
-  }
-  const indices = earcut(flattened);
+  
+  // Use simple shoelace formula for rectangles
   let area = 0;
-  for (let i = 0; i < indices.length; i += 3) {
-    const a = indices[i];
-    const b = indices[i + 1];
-    const c = indices[i + 2];
-    area += triangleArea(flattened, a, b, c);
+  for (let i = 0; i < points.length; i++) {
+    const j = (i + 1) % points.length;
+    area += points[i].x * points[j].y;
+    area -= points[j].x * points[i].y;
   }
+  
+  area = Math.abs(area / 2);
+  console.log('Polygon area calculation:');
+  console.log('Points:', points);
+  console.log('Raw area:', area);
+  console.log('Area in sq ft:', area / (PIXELS_PER_FOOT * PIXELS_PER_FOOT));
+  
   return area;
 }
 
