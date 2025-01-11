@@ -271,18 +271,22 @@ function findAlignedBoundaryWalls(wall: WallData, walls: WallData[]): WallData[]
   return targetSegment || [wall];
 }
 
-export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
+export function drawWalls(
+  ctx: CanvasRenderingContext2D, 
+  walls: WallData[],
+  showMeasurements: boolean = false
+) {
   console.log("\nDrawing walls:", walls.map(w => w.id));
   
   // Calculate total area
   const { totalArea } = calculateAreaAndVolume(walls, []);
   
-  // Draw all walls without measurements
+  // Draw all walls
   walls.forEach((wall) => {
     ctx.save();
     ctx.strokeStyle = "#333";
-    ctx.lineWidth = 10;  // Thick walls
-    ctx.lineCap = "square";  // Square ends for walls
+    ctx.lineWidth = 10;
+    ctx.lineCap = "square";
     
     ctx.beginPath();
     ctx.moveTo(wall.start.x, wall.start.y);
@@ -292,7 +296,6 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
       const end = wall.end;
       const cp = wall.controlPoints[0];
 
-      // Calculate midpoint and control point
       const midX = (start.x + end.x) / 2;
       const midY = (start.y + end.y) / 2;
       const dx = end.x - start.x;
@@ -301,10 +304,7 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
       const normalX = -dy / dist;
       const normalY = dx / dist;
 
-      // Calculate how far the control point is from the line
       const cpDist = (cp.x - start.x) * normalX + (cp.y - start.y) * normalY;
-      
-      // Use quadratic curve for smoother control
       const controlX = midX + normalX * cpDist;
       const controlY = midY + normalY * cpDist;
       
@@ -314,13 +314,22 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
     }
     ctx.stroke();
     ctx.restore();
+
+    // Draw measurement if enabled
+    if (showMeasurements) {
+      const length = getDistance(wall.start, wall.end);
+      drawWallMeasurement(ctx, wall, -25, length);
+    }
   });
 }
 
-export function drawInProgressWall(ctx: CanvasRenderingContext2D, wall: WallData) {
+export function drawInProgressWall(
+  ctx: CanvasRenderingContext2D, 
+  wall: WallData,
+  showMeasurements: boolean = true
+) {
   ctx.save();
   
-  // Draw the preview line
   ctx.strokeStyle = "#4a90e2";
   ctx.lineWidth = 10;
   ctx.lineCap = "square";
@@ -332,7 +341,7 @@ export function drawInProgressWall(ctx: CanvasRenderingContext2D, wall: WallData
     const start = wall.start;
     const end = wall.end;
     const cp = wall.controlPoints[0];
-    
+
     const midX = (start.x + end.x) / 2;
     const midY = (start.y + end.y) / 2;
     const dx = end.x - start.x;
@@ -340,7 +349,7 @@ export function drawInProgressWall(ctx: CanvasRenderingContext2D, wall: WallData
     const dist = Math.sqrt(dx * dx + dy * dy);
     const normalX = -dy / dist;
     const normalY = dx / dist;
-    
+
     const cpDist = (cp.x - start.x) * normalX + (cp.y - start.y) * normalY;
     const controlX = midX + normalX * cpDist;
     const controlY = midY + normalY * cpDist;
@@ -351,14 +360,21 @@ export function drawInProgressWall(ctx: CanvasRenderingContext2D, wall: WallData
   }
   ctx.stroke();
   
-  // Draw measurement for preview
-  const length = getDistance(wall.start, wall.end);
-  drawWallMeasurement(ctx, wall, -25, length);
+  // Always show measurement for in-progress wall
+  if (showMeasurements) {
+    const length = getDistance(wall.start, wall.end);
+    drawWallMeasurement(ctx, wall, -25, length);
+  }
   
   ctx.restore();
 }
 
-export function drawRoomPreview(ctx: CanvasRenderingContext2D, start: Point2D, end: Point2D) {
+export function drawRoomPreview(
+  ctx: CanvasRenderingContext2D, 
+  start: Point2D, 
+  end: Point2D,
+  showMeasurements: boolean = true
+) {
   const width = Math.abs(end.x - start.x);
   const height = Math.abs(end.y - start.y);
   
@@ -375,23 +391,25 @@ export function drawRoomPreview(ctx: CanvasRenderingContext2D, start: Point2D, e
   ctx.rect(x, y, width, height);
   ctx.stroke();
   
-  // Draw dimensions
-  ctx.font = '14px Arial';
-  ctx.fillStyle = '#333';
-  ctx.textAlign = 'center';
-  ctx.setLineDash([]);
-  
-  // Width measurement (top)
-  const widthInFeet = width / PIXELS_PER_FOOT;
-  ctx.fillText(`${widthInFeet.toFixed(1)} ft`, x + width / 2, y - 10);
-  
-  // Height measurement (left side)
-  const heightInFeet = height / PIXELS_PER_FOOT;
-  ctx.save();
-  ctx.translate(x - 10, y + height / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText(`${heightInFeet.toFixed(1)} ft`, 0, 0);
-  ctx.restore();
+  // Draw dimensions if enabled
+  if (showMeasurements) {
+    ctx.font = '14px Arial';
+    ctx.fillStyle = '#333';
+    ctx.textAlign = 'center';
+    ctx.setLineDash([]);
+    
+    // Width measurement (top)
+    const widthInFeet = width / PIXELS_PER_FOOT;
+    ctx.fillText(`${widthInFeet.toFixed(1)} ft`, x + width / 2, y - 10);
+    
+    // Height measurement (left side)
+    const heightInFeet = height / PIXELS_PER_FOOT;
+    ctx.save();
+    ctx.translate(x - 10, y + height / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText(`${heightInFeet.toFixed(1)} ft`, 0, 0);
+    ctx.restore();
+  }
   
   ctx.restore();
 }

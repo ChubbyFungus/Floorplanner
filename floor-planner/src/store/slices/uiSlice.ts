@@ -6,6 +6,7 @@ export interface UiState {
   angleSnapEnabled: boolean;
   angleSnapIncrement: number;
   selectedTool: string | null;
+  showMeasurements: boolean;
   errorMessage: string | null;
 }
 
@@ -15,6 +16,7 @@ const initialState: UiState = {
   angleSnapEnabled: true,
   angleSnapIncrement: 15,
   selectedTool: 'wall',
+  showMeasurements: true,
   errorMessage: null
 };
 
@@ -30,6 +32,9 @@ export const uiSlice = createSlice({
     },
     toggleAngleSnap: (state) => {
       state.angleSnapEnabled = !state.angleSnapEnabled;
+    },
+    toggleMeasurements: (state) => {
+      state.showMeasurements = !state.showMeasurements;
     },
     setAngleSnapIncrement: (state, action: PayloadAction<number>) => {
       state.angleSnapIncrement = action.payload;
@@ -48,6 +53,7 @@ export const {
   toggleGrid,
   toggleSnapToGrid,
   toggleAngleSnap,
+  toggleMeasurements,
   setAngleSnapIncrement,
   setSelectedTool,
   setErrorMessage

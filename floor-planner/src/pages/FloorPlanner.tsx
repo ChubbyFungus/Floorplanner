@@ -7,7 +7,8 @@ import {
   toggleAngleSnap,
   setAngleSnapIncrement,
   setSelectedTool,
-  setErrorMessage
+  setErrorMessage,
+  toggleMeasurements
 } from "../store/slices/uiSlice";
 import { setDimensions } from "../store/slices/floorPlannerSlice";
 import { calculateAreaAndVolume } from "../utils/geometryUtils";
@@ -18,7 +19,15 @@ import { FloorPlanner3D } from "../components/floorplanner/FloorPlanner3D";
 export const FloorPlanner: React.FC = () => {
   const dispatch = useDispatch();
   const ui = useSelector((state: RootState) => state.ui);
-  const { angleSnapEnabled, angleSnapIncrement, showGrid, snapToGrid, selectedTool, errorMessage } = ui;
+  const { 
+    angleSnapEnabled, 
+    angleSnapIncrement, 
+    showGrid, 
+    snapToGrid, 
+    selectedTool, 
+    showMeasurements,
+    errorMessage 
+  } = ui;
 
   const floorPlanner = useSelector((state: RootState) => state.floorPlanner);
   const { walls, fixtures, dimensions } = floorPlanner;
@@ -41,6 +50,10 @@ export const FloorPlanner: React.FC = () => {
 
   const handleToggleAngleSnap = () => {
     dispatch(toggleAngleSnap());
+  };
+
+  const handleToggleMeasurements = () => {
+    dispatch(toggleMeasurements());
   };
 
   const handleAngleSnapChange = (_: any, value: number | number[]) => {
@@ -87,6 +100,9 @@ export const FloorPlanner: React.FC = () => {
         </Button>
         <Button variant="contained" onClick={handleToggleAngleSnap}>
           {angleSnapEnabled ? "Disable Angle Snap" : "Enable Angle Snap"}
+        </Button>
+        <Button variant="contained" onClick={handleToggleMeasurements}>
+          {showMeasurements ? "Hide Measurements" : "Show Measurements"}
         </Button>
 
         <Box width={200} ml={2}>

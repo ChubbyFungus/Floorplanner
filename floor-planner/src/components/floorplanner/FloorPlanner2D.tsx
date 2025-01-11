@@ -34,7 +34,7 @@ export const FloorPlanner2D: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const wallInProgress = useSelector((state: RootState) => state.floorPlanner.wallInProgress);
   const walls = useSelector((state: RootState) => state.floorPlanner.walls);
-  const { angleSnapEnabled, angleSnapIncrement, selectedTool } = useSelector((state: RootState) => {
+  const { angleSnapEnabled, angleSnapIncrement, selectedTool, showMeasurements } = useSelector((state: RootState) => {
     console.log('Redux state:', state);
     console.log('UI state:', state.ui);
     return state.ui;
@@ -58,14 +58,16 @@ export const FloorPlanner2D: React.FC = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Draw existing walls
-    drawWalls(ctx, walls);
+    drawWalls(ctx, walls, showMeasurements);
 
     // Draw wall segment measurements
-    drawWallSegmentMeasurements(ctx, walls);
+    if (showMeasurements) {
+      drawWallSegmentMeasurements(ctx, walls);
+    }
 
     // Draw wall in progress
     if (wallInProgress) {
-      drawInProgressWall(ctx, wallInProgress);
+      drawInProgressWall(ctx, wallInProgress, showMeasurements);
 
       // Draw dynamic measurements and angle
       ctx.font = '14px Arial';
@@ -88,11 +90,11 @@ export const FloorPlanner2D: React.FC = () => {
 
     // Draw room preview
     if (roomStart && selectedTool === 'room') {
-      drawRoomPreview(ctx, roomStart, mousePos);
+      drawRoomPreview(ctx, roomStart, mousePos, showMeasurements);
     }
 
     ctx.restore();
-  }, [walls, wallInProgress, roomStart, selectedTool, mousePos]);
+  }, [walls, wallInProgress, roomStart, selectedTool, mousePos, showMeasurements]);
 
   // Canvas setup effect
   useEffect(() => {
