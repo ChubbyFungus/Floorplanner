@@ -129,22 +129,15 @@ export const FloorPlanner2D: React.FC = () => {
       const parent = canvas.parentElement;
       if (!parent) return;
 
-      const dpr = window.devicePixelRatio || 1;
       const rect = parent.getBoundingClientRect();
-
+      
       // Set display size (css pixels)
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
 
-      // Set actual size in memory (scaled for DPI)
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-
-      // Scale all drawing operations by dpr
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.scale(dpr, dpr);
-      }
+      // Set actual size in memory (no DPR scaling)
+      canvas.width = rect.width;
+      canvas.height = rect.height;
 
       redraw();
     };
@@ -215,13 +208,16 @@ export const FloorPlanner2D: React.FC = () => {
     if (!canvas) return { x: 0, y: 0 };
 
     const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
+    
+    // Get the scale factor between canvas logical size and displayed size
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
 
-    // Convert mouse coordinates to canvas coordinates, accounting for DPR
-    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    // Convert mouse coordinates to canvas coordinates
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
 
-    return { x: x / dpr, y: y / dpr };
+    return { x, y };
   }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
