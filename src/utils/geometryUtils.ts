@@ -98,3 +98,59 @@ export function flattenPoints(points: Point2D[]): number[] {
         return flat;
     }, []);
 }
+
+// Unit conversion constants
+export const INCHES_TO_FEET = 1 / 12;
+export const SQUARE_INCHES_TO_SQUARE_FEET = 1 / 144;  // 12 * 12
+export const DEFAULT_SCALE_PX_PER_INCH = 2.5;
+
+/**
+ * Converts pixels to inches based on the given scale
+ * @param pixels Number of pixels
+ * @param pixelsPerInch Scale factor (default: 2.5 pixels per inch)
+ * @returns Length in inches
+ */
+export function pixelsToInches(pixels: number, pixelsPerInch: number = DEFAULT_SCALE_PX_PER_INCH): number {
+    return pixels / pixelsPerInch;
+}
+
+/**
+ * Converts square pixels to square feet
+ * @param squarePixels Area in square pixels
+ * @param pixelsPerInch Scale factor (default: 2.5 pixels per inch)
+ * @returns Area in square feet
+ */
+export function squarePixelsToSquareFeet(squarePixels: number, pixelsPerInch: number = DEFAULT_SCALE_PX_PER_INCH): number {
+    const squareInches = Math.pow(pixelsToInches(Math.sqrt(squarePixels), pixelsPerInch), 2);
+    return squareInches * SQUARE_INCHES_TO_SQUARE_FEET;
+}
+
+/**
+ * Converts square inches to square feet
+ * @param squareInches Area in square inches
+ * @returns Area in square feet
+ */
+export function squareInchesToSquareFeet(squareInches: number): number {
+    return squareInches * SQUARE_INCHES_TO_SQUARE_FEET;
+}
+
+/**
+ * Calculates room area in square feet from a polygon of points
+ * @param points Array of points forming the room polygon
+ * @param isInPixels Whether the input points are in pixels (true) or inches (false)
+ * @param pixelsPerInch Scale factor when input is in pixels (default: 2.5 pixels per inch)
+ * @returns Area in square feet
+ */
+export function calculateRoomAreaInSquareFeet(
+    points: Point2D[], 
+    isInPixels: boolean = true,
+    pixelsPerInch: number = DEFAULT_SCALE_PX_PER_INCH
+): number {
+    const area = calculatePolygonArea(points);
+    
+    if (isInPixels) {
+        return squarePixelsToSquareFeet(area, pixelsPerInch);
+    } else {
+        return squareInchesToSquareFeet(area);
+    }
+}
