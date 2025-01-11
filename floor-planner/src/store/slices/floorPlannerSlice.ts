@@ -35,14 +35,16 @@ export const floorPlannerSlice = createSlice({
     // 1) Wall Creation
     // --------------------------------
     startWall: (state, action: PayloadAction<{ x: number; y: number }>) => {
+      console.log('Starting wall at:', action.payload);
       state.wallInProgress = {
         id: uuidv4(),
         start: action.payload,
         end: action.payload,
         controlPoints: [],
-        thickness: 5,
-        height: 96
+        thickness: 10,
+        height: 280
       };
+      console.log('Wall in progress:', state.wallInProgress);
     },
     addWallControlPoint: (state, action: PayloadAction<{ x: number; y: number }>) => {
       if (state.wallInProgress) {
@@ -61,10 +63,12 @@ export const floorPlannerSlice = createSlice({
       }
     },
     finalizeWall: (state) => {
+      console.log('Finalizing wall:', state.wallInProgress);
       if (state.wallInProgress) {
         state.walls.push(state.wallInProgress);
         state.wallInProgress = null;
       }
+      console.log('Updated walls:', state.walls);
     },
     cancelWall: (state) => {
       state.wallInProgress = null;

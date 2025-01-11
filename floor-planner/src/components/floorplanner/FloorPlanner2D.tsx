@@ -238,10 +238,11 @@ export const FloorPlanner2D: React.FC = () => {
         }
       } else {
         console.log('Starting new wall', { point, walls });
-        // Only start a new wall if clicking near an existing wall endpoint
-        // or if there are no walls yet
-        if (walls.length === 0 || isConnectedToExistingWall(point, walls)) {
-          console.log('Dispatching startWall');
+        if (walls.length === 0) {
+          console.log('First wall - starting at any point');
+          dispatch(startWall(point));
+        } else if (isConnectedToExistingWall(point, walls)) {
+          console.log('Connected to existing wall - starting new wall');
           dispatch(startWall(point));
         } else {
           console.log('Point not connected to existing wall');
