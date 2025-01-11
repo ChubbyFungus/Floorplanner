@@ -2,6 +2,8 @@
 import { WallData, Point2D } from "../../types";
 import { pixelsToFeetAndInches } from "../../utils/geometryUtils";
 
+const POINT_TOLERANCE = 1e-6;
+
 // Helper function to draw wall measurement
 function drawWallMeasurement(ctx: CanvasRenderingContext2D, start: Point2D, end: Point2D, offset: number = 20) {
   const dx = end.x - start.x;
@@ -56,19 +58,88 @@ function drawWallMeasurement(ctx: CanvasRenderingContext2D, start: Point2D, end:
 
 // Helper function to find wall intersections
 function findWallIntersections(wall: WallData, walls: WallData[]): Point2D[] {
-  const intersections: Point2D[] = [];
+  const intersections: Set<string> = new Set(); // Use Set to avoid duplicates
   
-  // Check for intersections with other walls
-  walls.forEach(otherWall => {
-    if (wall !== otherWall) {
-      const intersection = findIntersection(wall.start, wall.end, otherWall.start, otherWall.end);
-      if (intersection) {
-        intersections.push(intersection);
+  for (const otherWall of walls) {
+    if (wall === otherWall) continue;
+    
+    // Skip curved walls for now
+    if (wall.controlPoints?.length || otherWall.controlPoints?.length) continue;
+    
+    // Check if any point of otherWall lies on wall
+    const points = [otherWall.start, otherWall.end];
+    for (const point of points) {
+      const { distance, nearestPoint } = getDistanceToLineSegment(point, wall.start, wall.end);
+      if (distance <= POINT_TOLERANCE) {
+        // Add point as JSON string to ensure unique points
+        intersections.add(JSON.stringify(nearestPoint));
       }
     }
-  });
+    
+    // Check if any point of wall lies on otherWall
+    const wallPoints = [wall.start, wall.end];
+    for (const point of wallPoints) {
+      const { distance, nearestPoint } = getDistanceToLineSegment(point, otherWall.start, otherWall.end);
+      if (distance <= POINT_TOLERANCE) {
+        intersections.add(JSON.stringify(nearestPoint));
+      }
+    }
+    
+    // Check for T-junctions and parallel wall segments
+    if (areWallsParallel(wall, otherWall)) {
+      // Project wall endpoints onto otherWall
+      const wallProjections = [
+        projectPointOnWall(wall.start, otherWall),
+        projectPointOnWall(wall.end, otherWall)
+      ];
+      
+      // Project otherWall endpoints onto wall
+      const otherWallProjections = [
+        projectPointOnWall(otherWall.start, wall),
+        projectPointOnWall(otherWall.end, wall)
+      ];
+      
+      // Add all valid projections
+      [...wallProjections, ...otherWallProjections].forEach(proj => {
+        if (proj) intersections.add(JSON.stringify(proj));
+      });
+    }
+  }
   
-  return intersections;
+  // Convert back to points
+  return Array.from(intersections).map(str => JSON.parse(str));
+}
+
+// Check if two walls are parallel
+function areWallsParallel(wall1: WallData, wall2: WallData): boolean {
+  const dx1 = wall1.end.x - wall1.start.x;
+  const dy1 = wall1.end.y - wall1.start.y;
+  const dx2 = wall2.end.x - wall2.start.x;
+  const dy2 = wall2.end.y - wall2.start.y;
+  
+  // Calculate angles and compare
+  const angle1 = Math.atan2(dy1, dx1);
+  const angle2 = Math.atan2(dy2, dx2);
+  
+  // Account for angles being the same or 180 degrees apart
+  const angleDiff = Math.abs(angle1 - angle2);
+  return angleDiff < 0.1 || Math.abs(angleDiff - Math.PI) < 0.1;
+}
+
+// Project a point onto a wall, return null if projection is outside wall segment
+function projectPointOnWall(point: Point2D, wall: WallData): Point2D | null {
+  const { nearestPoint } = getDistanceToLineSegment(point, wall.start, wall.end);
+  
+  // Check if projection point is on the wall segment
+  const distToStart = getDistance(nearestPoint, wall.start);
+  const distToEnd = getDistance(nearestPoint, wall.end);
+  const wallLength = getDistance(wall.start, wall.end);
+  
+  if (distToStart <= wallLength && distToEnd <= wallLength) {
+    return nearestPoint;
+  }
+  
+  return null;
 }
 
 // Helper function to find intersection between two lines
@@ -97,6 +168,21 @@ function getDistance(p1: Point2D, p2: Point2D): number {
   const dx = p2.x - p1.x;
   const dy = p2.y - p1.y;
   return Math.sqrt(dx * dx + dy * dy);
+}
+
+// Helper function to calculate distance from a point to a line segment
+function getDistanceToLineSegment(point: Point2D, lineStart: Point2D, lineEnd: Point2D): { distance: number; nearestPoint: Point2D } {
+  const lineLength = getDistance(lineStart, lineEnd);
+  if (lineLength === 0) {
+    return { distance: getDistance(point, lineStart), nearestPoint: lineStart };
+  }
+  
+  const t = Math.max(0, Math.min(1, ((point.x - lineStart.x) * (lineEnd.x - lineStart.x) + (point.y - lineStart.y) * (lineEnd.y - lineStart.y)) / (lineLength * lineLength)));
+  const nearestPoint = {
+    x: lineStart.x + t * (lineEnd.x - lineStart.x),
+    y: lineStart.y + t * (lineEnd.y - lineStart.y)
+  };
+  return { distance: getDistance(point, nearestPoint), nearestPoint };
 }
 
 export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
