@@ -464,13 +464,66 @@ function shouldSplitAtIntersection(wall: WallData, intersection: Point2D, walls:
          connectingWalls.some(w => getDistance(w.start, w.end) >= 60);
 }
 
-export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
-  // First normalize measurements for parallel walls
-  const normalizedMeasurements = normalizeParallelMeasurements(walls);
+// Helper function to find aligned walls that form a continuous boundary
+function findAlignedBoundaryWalls(wall: WallData, walls: WallData[]): WallData[] {
+  const alignedWalls = [wall];
+  const angle = Math.atan2(wall.end.y - wall.start.y, wall.end.x - wall.start.x);
   
-  // Draw walls
+  for (const otherWall of walls) {
+    if (otherWall === wall) continue;
+    
+    const otherAngle = Math.atan2(otherWall.end.y - otherWall.start.y, otherWall.end.x - otherWall.start.x);
+    if (Math.abs(angle - otherAngle) < 0.1 || Math.abs(Math.abs(angle - otherAngle) - Math.PI) < 0.1) {
+      // Check if walls are close to each other
+      const dist = getParallelWallDistance(wall, otherWall);
+      if (dist < wall.thickness * 2) {
+        alignedWalls.push(otherWall);
+      }
+    }
+  }
+  
+  return alignedWalls;
+}
+
+// Helper function to get the combined wall length and endpoints
+function getCombinedWallInfo(walls: WallData[]): { start: Point2D; end: Point2D; length: number } {
+  if (walls.length === 0) return null;
+  if (walls.length === 1) return {
+    start: walls[0].start,
+    end: walls[0].end,
+    length: getDistance(walls[0].start, walls[0].end)
+  };
+  
+  // Find the extreme points
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   walls.forEach(wall => {
-    // Draw the wall
+    minX = Math.min(minX, wall.start.x, wall.end.x);
+    minY = Math.min(minY, wall.start.y, wall.end.y);
+    maxX = Math.max(maxX, wall.start.x, wall.end.x);
+    maxY = Math.max(maxY, wall.start.y, wall.end.y);
+  });
+  
+  // Determine if wall is more horizontal or vertical
+  const isHorizontal = (maxX - minX) > (maxY - minY);
+  
+  const start = isHorizontal ? 
+    { x: minX, y: walls[0].start.y } :
+    { x: walls[0].start.x, y: minY };
+  
+  const end = isHorizontal ?
+    { x: maxX, y: walls[0].end.y } :
+    { x: walls[0].end.x, y: maxY };
+  
+  return {
+    start,
+    end,
+    length: getDistance(start, end)
+  };
+}
+
+export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
+  // First draw all walls
+  walls.forEach(wall => {
     ctx.beginPath();
     ctx.moveTo(wall.start.x, wall.start.y);
     ctx.lineTo(wall.end.x, wall.end.y);
@@ -484,40 +537,43 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
     ctx.arc(wall.end.x, wall.end.y, 3, 0, 2 * Math.PI);
     ctx.fillStyle = '#0000ff';
     ctx.fill();
-    
-    // Only show measurements for appropriate walls
-    if (shouldShowWallMeasurement(wall, walls)) {
-      const wallKey = `${wall.start.x},${wall.start.y}-${wall.end.x},${wall.end.y}`;
-      const normalizedLength = normalizedMeasurements.get(wallKey);
-      drawWallMeasurement(ctx, wall, 25, normalizedLength, walls);
-    }
   });
   
-  // Draw segment measurements only for walls that need them
+  // Then draw measurements
+  const processedWalls = new Set<WallData>();
+  
+  // First draw boundary measurements
   walls.forEach(wall => {
-    if (!shouldShowWallMeasurement(wall, walls)) return;
+    if (processedWalls.has(wall)) return;
+    if (!isRoomBoundaryWall(wall, walls)) return;
     
-    const intersections = findWallIntersections(wall, walls)
-      .filter(intersection => shouldSplitAtIntersection(wall, intersection, walls));
+    // Find all aligned walls that form this boundary
+    const alignedWalls = findAlignedBoundaryWalls(wall, walls);
+    const combinedInfo = getCombinedWallInfo(alignedWalls);
     
-    if (intersections.length > 0) {
-      // Sort points along the wall from start to end
-      const points = [wall.start, ...intersections, wall.end].sort((a, b) => {
-        const distA = getDistance(wall.start, a);
-        const distB = getDistance(wall.start, b);
-        return distA - distB;
-      });
-      
-      // Draw measurements for each segment
-      for (let i = 0; i < points.length - 1; i++) {
-        const segmentWall: WallData = {
-          id: wall.id + '_segment_' + i,
-          start: points[i],
-          end: points[i + 1],
-          thickness: wall.thickness,
-          controlPoints: []
-        };
-        drawWallMeasurement(ctx, segmentWall, 25, undefined, walls);
+    // Create a temporary wall for the full boundary measurement
+    const boundaryWall: WallData = {
+      id: wall.id + '_boundary',
+      start: combinedInfo.start,
+      end: combinedInfo.end,
+      thickness: wall.thickness,
+      controlPoints: []
+    };
+    
+    // Draw the boundary measurement on the outside
+    drawWallMeasurement(ctx, boundaryWall, 25, combinedInfo.length, walls);
+    
+    // Mark all these walls as processed
+    alignedWalls.forEach(w => processedWalls.add(w));
+  });
+  
+  // Then draw interior measurements
+  walls.forEach(wall => {
+    if (!processedWalls.has(wall)) {
+      const length = getDistance(wall.start, wall.end);
+      if (length >= 36) { // Only show interior measurements for walls >= 3 feet
+        // Draw interior measurement
+        drawWallMeasurement(ctx, wall, -25, length, walls);
       }
     }
   });
