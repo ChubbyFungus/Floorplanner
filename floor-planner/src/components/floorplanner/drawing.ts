@@ -66,47 +66,41 @@ function findWallIntersections(wall: WallData, walls: WallData[]): Point2D[] {
     // Skip curved walls for now
     if (wall.controlPoints?.length || otherWall.controlPoints?.length) continue;
     
-    // Check if any point of otherWall lies on wall
-    const points = [otherWall.start, otherWall.end];
-    for (const point of points) {
-      const { distance, nearestPoint } = getDistanceToLineSegment(point, wall.start, wall.end);
-      if (distance <= POINT_TOLERANCE) {
-        // Add point as JSON string to ensure unique points
-        intersections.add(JSON.stringify(nearestPoint));
-      }
-    }
+    // Only consider walls that are parallel or perpendicular
+    const angle = getWallAngle(wall, otherWall);
+    if (angle > 0.1 && Math.abs(angle - Math.PI/2) > 0.1) continue;
     
-    // Check if any point of wall lies on otherWall
-    const wallPoints = [wall.start, wall.end];
-    for (const point of wallPoints) {
-      const { distance, nearestPoint } = getDistanceToLineSegment(point, otherWall.start, otherWall.end);
-      if (distance <= POINT_TOLERANCE) {
-        intersections.add(JSON.stringify(nearestPoint));
-      }
-    }
-    
-    // Check for T-junctions and parallel wall segments
+    // For parallel walls, only consider if they're directly across from each other
     if (areWallsParallel(wall, otherWall)) {
-      // Project wall endpoints onto otherWall
-      const wallProjections = [
-        projectPointOnWall(wall.start, otherWall),
-        projectPointOnWall(wall.end, otherWall)
-      ];
+      const dist = getParallelWallDistance(wall, otherWall);
+      // Skip if walls are too far apart (not likely to be part of same room)
+      if (dist > 200) continue;
       
-      // Project otherWall endpoints onto wall
-      const otherWallProjections = [
-        projectPointOnWall(otherWall.start, wall),
-        projectPointOnWall(otherWall.end, wall)
-      ];
+      // Only consider endpoints that are within the wall's span
+      const wallSpan = getWallSpan(wall);
+      const otherWallSpan = getWallSpan(otherWall);
       
-      // Add all valid projections
-      [...wallProjections, ...otherWallProjections].forEach(proj => {
-        if (proj) intersections.add(JSON.stringify(proj));
-      });
+      if (doSpansOverlap(wallSpan, otherWallSpan)) {
+        const points = [otherWall.start, otherWall.end];
+        for (const point of points) {
+          const projection = projectPointOnWall(point, wall);
+          if (projection) {
+            intersections.add(JSON.stringify(projection));
+          }
+        }
+      }
+    } else {
+      // For perpendicular walls, just check endpoints
+      const points = [otherWall.start, otherWall.end];
+      for (const point of points) {
+        const { distance, nearestPoint } = getDistanceToLineSegment(point, wall.start, wall.end);
+        if (distance <= POINT_TOLERANCE) {
+          intersections.add(JSON.stringify(nearestPoint));
+        }
+      }
     }
   }
   
-  // Convert back to points
   return Array.from(intersections).map(str => JSON.parse(str));
 }
 
@@ -183,6 +177,52 @@ function getDistanceToLineSegment(point: Point2D, lineStart: Point2D, lineEnd: P
     y: lineStart.y + t * (lineEnd.y - lineStart.y)
   };
   return { distance: getDistance(point, nearestPoint), nearestPoint };
+}
+
+// Get angle between two walls (0 for parallel, PI/2 for perpendicular)
+function getWallAngle(wall1: WallData, wall2: WallData): number {
+  const dx1 = wall1.end.x - wall1.start.x;
+  const dy1 = wall1.end.y - wall1.start.y;
+  const dx2 = wall2.end.x - wall2.start.x;
+  const dy2 = wall2.end.y - wall2.start.y;
+  
+  const angle1 = Math.atan2(dy1, dx1);
+  const angle2 = Math.atan2(dy2, dx2);
+  
+  let diff = Math.abs(angle1 - angle2);
+  if (diff > Math.PI) diff = 2 * Math.PI - diff;
+  return diff;
+}
+
+// Get the distance between parallel walls
+function getParallelWallDistance(wall1: WallData, wall2: WallData): number {
+  // Project start point of wall2 onto line of wall1
+  const { distance } = getDistanceToLineSegment(wall2.start, wall1.start, wall1.end);
+  return distance;
+}
+
+// Get the span of a wall (min/max coordinates in direction of wall)
+function getWallSpan(wall: WallData): { min: number; max: number } {
+  const dx = wall.end.x - wall.start.x;
+  const dy = wall.end.y - wall.start.y;
+  
+  // Get the primary direction (x or y) based on wall angle
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return {
+      min: Math.min(wall.start.x, wall.end.x),
+      max: Math.max(wall.start.x, wall.end.x)
+    };
+  } else {
+    return {
+      min: Math.min(wall.start.y, wall.end.y),
+      max: Math.max(wall.start.y, wall.end.y)
+    };
+  }
+}
+
+// Check if two spans overlap
+function doSpansOverlap(span1: { min: number; max: number }, span2: { min: number; max: number }): boolean {
+  return !(span1.max < span2.min || span2.max < span1.min);
 }
 
 export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
