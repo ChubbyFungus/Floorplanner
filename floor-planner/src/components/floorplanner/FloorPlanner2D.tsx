@@ -337,15 +337,15 @@ export const FloorPlanner2D: React.FC = () => {
         const depth = Math.abs(point.y - roomStart.y);
         
         // Convert dimensions to feet for display
-        const widthInFeet = (width * 2) / PIXELS_PER_FOOT;
-        const depthInFeet = (depth * 2) / PIXELS_PER_FOOT;
+        const widthInFeet = width / PIXELS_PER_FOOT;
+        const depthInFeet = depth / PIXELS_PER_FOOT;
         console.log(`Room dimensions: ${widthInFeet.toFixed(2)}' x ${depthInFeet.toFixed(2)}'`);
         
         void dispatch(createRectangularRoom({
           startX: Math.min(roomStart.x, point.x),
           startY: Math.min(roomStart.y, point.y),
-          width: width * 2,
-          depth: depth * 2,
+          width,
+          depth,
           thickness: 10,
           height: 280
         }));
