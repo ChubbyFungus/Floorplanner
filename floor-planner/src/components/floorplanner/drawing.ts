@@ -397,8 +397,35 @@ function isRoomBoundaryWall(wall: WallData, walls: WallData[]): boolean {
 
 // Helper function to determine if a wall should show measurements
 function shouldShowWallMeasurement(wall: WallData, walls: WallData[]): boolean {
-  // Always show measurements for room boundary walls
-  if (isRoomBoundaryWall(wall, walls)) return true;
+  // Always show measurements for main room boundary walls
+  if (isRoomBoundaryWall(wall, walls)) {
+    // Skip small walls (like doorways or small segments)
+    const length = getDistance(wall.start, wall.end);
+    if (length < 60) return false; // Skip walls shorter than 5 feet (60 inches)
+    
+    // Skip walls that are part of a larger aligned wall
+    for (const otherWall of walls) {
+      if (wall === otherWall) continue;
+      
+      // Check if walls are aligned (same line)
+      const angle = getWallAngle(wall, otherWall);
+      if (angle < 0.1 || Math.abs(angle - Math.PI) < 0.1) {
+        // Check if walls are close to each other
+        const dist = getParallelWallDistance(wall, otherWall);
+        if (dist < wall.thickness * 2) {
+          // Check if this wall is shorter
+          const otherLength = getDistance(otherWall.start, otherWall.end);
+          if (length < otherLength) return false;
+        }
+      }
+    }
+    
+    return true;
+  }
+  
+  // For non-boundary walls, only show if they're significant
+  const length = getDistance(wall.start, wall.end);
+  if (length < 60) return false; // Skip walls shorter than 5 feet
   
   // Show measurements for standalone walls
   const connectedWalls = walls.filter(w => {
@@ -420,14 +447,22 @@ function shouldSplitAtIntersection(wall: WallData, intersection: Point2D, walls:
     return arePointsEqual(w.start, intersection) || arePointsEqual(w.end, intersection);
   });
   
-  // Don't split if there's only one connecting wall and it's perpendicular
+  // Don't split if there's only one connecting wall
   if (connectingWalls.length === 1) {
-    const angle = getWallAngle(wall, connectingWalls[0]);
-    return Math.abs(angle - Math.PI/2) > 0.1;
+    const connectingWall = connectingWalls[0];
+    
+    // Don't split if the connecting wall is small (like a doorway)
+    const connectingLength = getDistance(connectingWall.start, connectingWall.end);
+    if (connectingLength < 60) return false;
+    
+    // Don't split if the connecting wall is perpendicular
+    const angle = getWallAngle(wall, connectingWall);
+    if (Math.abs(angle - Math.PI/2) < 0.1) return false;
   }
   
-  // Split if there are multiple connecting walls
-  return connectingWalls.length > 1;
+  // Split only if there are multiple significant connecting walls
+  return connectingWalls.length > 1 && 
+         connectingWalls.some(w => getDistance(w.start, w.end) >= 60);
 }
 
 export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
