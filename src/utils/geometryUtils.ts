@@ -4,11 +4,11 @@ export interface Point2D {
     y: number;
 }
 
-export interface Wall {
+export type WallData = {
     start: Point2D;
     end: Point2D;
-    controlPoints?: Point2D[];  // Optional control points for curved walls
-}
+    controlPoints?: Point2D[];
+};
 
 /**
  * Converts a curved wall into a series of straight line segments
@@ -16,7 +16,7 @@ export interface Wall {
  * @param segments Number of segments to divide the curve into (default: 10)
  * @returns Array of points representing the subdivided wall
  */
-export function subdivideWall(wall: Wall, segments: number = 10): Point2D[] {
+export function subdivideWall(wall: WallData, segments: number = 10): Point2D[] {
     // If wall has no control points, return just the start and end points
     if (!wall.controlPoints || wall.controlPoints.length === 0) {
         return [wall.start, wall.end];
@@ -153,4 +153,120 @@ export function calculateRoomAreaInSquareFeet(
     } else {
         return squareInchesToSquareFeet(area);
     }
+}
+
+/**
+ * Finds closed loops of walls that connect end-to-end
+ * @param walls Array of wall data
+ * @returns Array of wall arrays, each representing a closed loop
+ */
+export function findClosedLoops(walls: WallData[]): WallData[][] {
+    const loops: WallData[][] = [];
+    const usedWalls = new Set<WallData>();
+
+    for (const startWall of walls) {
+        if (usedWalls.has(startWall)) continue;
+
+        const currentLoop: WallData[] = [];
+        let currentWall = startWall;
+        let currentPoint = currentWall.end;
+
+        while (true) {
+            currentLoop.push(currentWall);
+            usedWalls.add(currentWall);
+
+            // Find next wall that starts at current wall's endpoint
+            const nextWall = walls.find(w => 
+                !usedWalls.has(w) && 
+                Math.abs(w.start.x - currentPoint.x) < 0.001 && 
+                Math.abs(w.start.y - currentPoint.y) < 0.001
+            );
+
+            if (!nextWall || nextWall === startWall) break;
+
+            currentWall = nextWall;
+            currentPoint = currentWall.end;
+        }
+
+        if (currentLoop.length > 2) {
+            loops.push(currentLoop);
+        }
+    }
+
+    return loops;
+}
+
+/**
+ * Converts walls to a polygon of line segments, subdividing curved walls
+ * @param walls Array of walls to convert
+ * @returns Array of 2D points forming the polygon
+ */
+export function subdivideWallsToPolygon(walls: WallData[]): Point2D[] {
+    const points: Point2D[] = [];
+
+    for (const wall of walls) {
+        if (!wall.controlPoints || wall.controlPoints.length === 0) {
+            points.push(wall.start);
+        } else {
+            // Subdivide curved wall into segments
+            const segments = 10; // Number of segments per curve
+            for (let i = 0; i <= segments; i++) {
+                const t = i / segments;
+                const point = getBezierPoint(t, wall.start, wall.controlPoints[0], wall.end);
+                if (i < segments) { // Don't add end point except for last wall
+                    points.push(point);
+                }
+            }
+        }
+    }
+
+    return points;
+}
+
+/**
+ * Calculates area of a polygon using earcut triangulation
+ * @param polygonPoints Array of polygon points
+ * @returns Area in square units
+ */
+export function earcutArea(polygonPoints: Point2D[]): number {
+    // Flatten points to [x0, y0, x1, y1, ...]
+    const flatPoints = flattenPoints(polygonPoints);
+    
+    // For now, using shoelace formula. Will be replaced with earcut when we add the library
+    let area = 0;
+    const n = polygonPoints.length;
+
+    for (let i = 0; i < n - 1; i++) {
+        area += polygonPoints[i].x * polygonPoints[i + 1].y - 
+                polygonPoints[i + 1].x * polygonPoints[i].y;
+    }
+    area += polygonPoints[n - 1].x * polygonPoints[0].y - 
+            polygonPoints[0].x * polygonPoints[n - 1].y;
+
+    return Math.abs(area) / 2;
+}
+
+/**
+ * Updates room area calculations
+ * @param walls Array of all walls
+ * @returns Total area in square feet
+ */
+export function updateRoomArea(walls: WallData[]): number {
+    // 1) Find loops (rooms)
+    const loops = findClosedLoops(walls);
+    
+    let totalSqInches = 0;
+    
+    for (const loop of loops) {
+        // 2) Subdivide curved walls -> polygon of line segments
+        const polygonPoints = subdivideWallsToPolygon(loop);
+        
+        // 3) Area in square inches
+        const areaInSqInches = earcutArea(polygonPoints);
+        
+        totalSqInches += areaInSqInches;
+    }
+    
+    // 4) Convert to sq ft
+    return totalSqInches / 144;
 }
