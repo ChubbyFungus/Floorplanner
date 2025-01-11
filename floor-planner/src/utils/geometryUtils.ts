@@ -167,17 +167,24 @@ function triangleArea(arr: number[], i0: number, i1: number, i2: number): number
 }
 
 export function pixelsToFeetAndInches(pixels: number): string {
-  const totalInches = pixels / PIXELS_PER_INCH;
+  const PIXELS_PER_FOOT = 20; // Adjust this value based on your scale
+  
+  const totalInches = (pixels / PIXELS_PER_FOOT) * 12;
   const feet = Math.floor(totalInches / 12);
   const inches = Math.round(totalInches % 12);
   
-  if (feet === 0) {
-    return `${inches}"`;
-  } else if (inches === 0) {
-    return `${feet}'`;
-  } else {
-    return `${feet}' ${inches}"`;
+  // Handle case where rounding inches results in 12
+  if (inches === 12) {
+    return `${feet + 1}'`;
   }
+  
+  // CAD style formatting:
+  // - If inches is 0, just show feet with '
+  // - Otherwise show feet and inches
+  if (inches === 0) {
+    return `${feet}'`;
+  }
+  return `${feet}'-${inches}"`;
 }
 
 export function feetAndInchesToPixels(feet: number, inches: number = 0): number {
