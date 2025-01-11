@@ -24,6 +24,7 @@ export function calculateAreaAndVolume(
   const loops = findAllLoops(walls);
   let totalRawArea = 0;
 
+<<<<<<< Updated upstream
   loops.forEach((loop) => {
     const polygonPoints = subdivideWallsIntoPolygon(loop);
     totalRawArea += polygonArea(polygonPoints);
@@ -39,6 +40,51 @@ export function calculateAreaAndVolume(
     totalArea: totalRawArea,
     totalVolume
   };
+=======
+  // For now, handle single rectangular rooms
+  // Later we'll add support for breaking irregular shapes into rectangles
+  if (walls.length === 4) {
+    // Find perpendicular walls
+    const wall1 = walls[0];
+    const wall2 = walls[1];
+    const angle = Math.atan2(
+      wall2.end.y - wall2.start.y,
+      wall2.end.x - wall2.start.x
+    ) - Math.atan2(
+      wall1.end.y - wall1.start.y,
+      wall1.end.x - wall1.start.x
+    );
+
+    // Check if walls are perpendicular (90 degrees = PI/2)
+    const isRectangular = Math.abs(Math.abs(angle) - Math.PI/2) < 0.1;
+    
+    if (isRectangular) {
+      // Get lengths in pixels
+      const length = getDistance(wall1.start, wall1.end);
+      const width = getDistance(wall2.start, wall2.end);
+      
+      // Convert to feet
+      const lengthInFeet = length / PIXELS_PER_FOOT;
+      const widthInFeet = width / PIXELS_PER_FOOT;
+      
+      console.log('Room dimensions (feet):', { lengthInFeet, widthInFeet });
+      
+      const totalAreaInSqFeet = lengthInFeet * widthInFeet;
+      
+      // Calculate volume using average wall height
+      const avgHeight = walls.reduce((acc, w) => acc + w.height, 0) / walls.length;
+      const totalVolume = totalAreaInSqFeet * avgHeight;
+
+      return {
+        totalArea: Math.round(totalAreaInSqFeet),
+        totalVolume: Math.round(totalVolume)
+      };
+    }
+  }
+
+  console.log('Non-rectangular room detected - will need to break into rectangles');
+  return { totalArea: 0, totalVolume: 0 };
+>>>>>>> Stashed changes
 }
 
 function findAllLoops(walls: WallData[]): WallData[][] {
