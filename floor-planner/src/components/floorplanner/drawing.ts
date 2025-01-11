@@ -332,6 +332,11 @@ function doSpansOverlap(span1: { min: number; max: number }, span2: { min: numbe
   return !(span1.max < span2.min || span2.max < span1.min);
 }
 
+// Helper function to check if two points are equal within tolerance
+function arePointsEqual(p1: Point2D, p2: Point2D): boolean {
+  return Math.abs(p1.x - p2.x) < POINT_TOLERANCE && Math.abs(p1.y - p2.y) < POINT_TOLERANCE;
+}
+
 // Helper function to check if a wall is part of a room boundary
 function isRoomBoundaryWall(wall: WallData, walls: WallData[]): boolean {
   let parallelCount = 0;
