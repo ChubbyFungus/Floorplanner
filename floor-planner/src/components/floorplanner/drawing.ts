@@ -283,7 +283,8 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
   walls.forEach((wall) => {
     ctx.save();
     ctx.strokeStyle = "#333";
-    ctx.lineWidth = 10;  // Changed from 2 to 10 for thicker walls
+    ctx.lineWidth = 10;  // Thick walls
+    ctx.lineCap = "square";  // Square ends for walls
     
     ctx.beginPath();
     ctx.moveTo(wall.start.x, wall.start.y);
@@ -314,14 +315,6 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
       ctx.lineTo(wall.end.x, wall.end.y);
     }
     ctx.stroke();
-
-    // Draw endpoints
-    ctx.beginPath();
-    ctx.arc(wall.start.x, wall.start.y, 3, 0, 2 * Math.PI);
-    ctx.arc(wall.end.x, wall.end.y, 3, 0, 2 * Math.PI);
-    ctx.fillStyle = '#0000ff';
-    ctx.fill();
-    
     ctx.restore();
   });
   
