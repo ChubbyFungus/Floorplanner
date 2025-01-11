@@ -24,7 +24,11 @@ export const FloorPlanner2D: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const wallInProgress = useSelector((state: RootState) => state.floorPlanner.wallInProgress);
   const walls = useSelector((state: RootState) => state.floorPlanner.walls);
-  const { angleSnapEnabled, angleSnapIncrement, selectedTool } = useSelector((state: RootState) => state.ui);
+  const { angleSnapEnabled, angleSnapIncrement, selectedTool } = useSelector((state: RootState) => {
+    console.log('Redux state:', state);
+    console.log('UI state:', state.ui);
+    return state.ui;
+  });
   const [isAltPressed, setIsAltPressed] = useState(false);
   const [roomStart, setRoomStart] = useState<Point2D | null>(null);
   const [mousePos, setMousePos] = useState<Point2D>({ x: 0, y: 0 });
@@ -200,6 +204,7 @@ export const FloorPlanner2D: React.FC = () => {
 
     if (selectedTool === 'wall') {
       console.log('Wall tool active');
+      console.log(`Selected tool: ${selectedTool} (Wall tool)`);
       if (wallInProgress) {
         console.log('Wall in progress');
         if (isAltPressed) {
@@ -243,6 +248,7 @@ export const FloorPlanner2D: React.FC = () => {
         }
       }
     } else if (selectedTool === 'room') {
+      console.log(`Selected tool: ${selectedTool} (Room tool)`);
       if (!roomStart) {
         setRoomStart(point);
       } else {

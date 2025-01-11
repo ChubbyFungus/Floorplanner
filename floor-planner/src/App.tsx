@@ -1,6 +1,8 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
+import { Provider } from "react-redux";
+import { store } from "./store";
 import Home from "./pages/Home";
 import { FloorPlanner } from "./pages/FloorPlanner";
 import ProjectManager from "./pages/ProjectManager";
@@ -23,17 +25,19 @@ const theme = createTheme({
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <Router>
-        <Header />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/floor-planner" element={<FloorPlanner />} />
-          <Route path="/projects" element={<ProjectManager />} />
-        </Routes>
-        <Footer />
-      </Router>
-    </ThemeProvider>
+    <Provider store={store}>
+      <ThemeProvider theme={theme}>
+        <Router>
+          <Header />
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/floor-planner" element={<FloorPlanner />} />
+            <Route path="/projects" element={<ProjectManager />} />
+          </Routes>
+          <Footer />
+        </Router>
+      </ThemeProvider>
+    </Provider>
   );
 }
 

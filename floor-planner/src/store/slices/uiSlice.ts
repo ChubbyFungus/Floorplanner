@@ -14,7 +14,7 @@ const initialState: UiState = {
   snapToGrid: true,
   angleSnapEnabled: true,
   angleSnapIncrement: 15,
-  selectedTool: null,
+  selectedTool: 'wall',
   errorMessage: null
 };
 
@@ -35,6 +35,7 @@ export const uiSlice = createSlice({
       state.angleSnapIncrement = action.payload;
     },
     setSelectedTool: (state, action: PayloadAction<string | null>) => {
+      console.log('Setting selected tool:', action.payload);
       state.selectedTool = action.payload;
     },
     setErrorMessage: (state, action: PayloadAction<string | null>) => {
