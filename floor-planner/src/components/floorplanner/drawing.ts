@@ -271,17 +271,54 @@ function findAlignedBoundaryWalls(wall: WallData, walls: WallData[]): WallData[]
   return targetSegment || [wall];
 }
 
+function isParallel(wall1: WallData, wall2: WallData): boolean {
+  const dx1 = wall1.end.x - wall1.start.x;
+  const dy1 = wall1.end.y - wall1.start.y;
+  const dx2 = wall2.end.x - wall2.start.x;
+  const dy2 = wall2.end.y - wall2.start.y;
+  
+  const angle1 = Math.atan2(dy1, dx1);
+  const angle2 = Math.atan2(dy2, dx2);
+  
+  // Consider walls parallel if their angles are within 1 degree
+  return Math.abs(angle1 - angle2) < Math.PI / 180 || 
+         Math.abs(angle1 - angle2) > Math.PI * 179 / 180;
+}
+
+function getWallLength(wall: WallData): number {
+  return getDistance(wall.start, wall.end);
+}
+
+function findParallelWalls(walls: WallData[]): Map<string, WallData[]> {
+  const parallelGroups = new Map<string, WallData[]>();
+  
+  walls.forEach((wall1) => {
+    if (!Array.from(parallelGroups.values()).flat().includes(wall1)) {
+      const group = walls.filter(wall2 => 
+        wall1 !== wall2 && 
+        isParallel(wall1, wall2) && 
+        Math.abs(getWallLength(wall1) - getWallLength(wall2)) < 1
+      );
+      
+      if (group.length > 0) {
+        const key = `${getWallLength(wall1).toFixed(1)}`;
+        parallelGroups.set(key, [wall1, ...group]);
+      } else {
+        const key = `${getWallLength(wall1).toFixed(1)}_${wall1.id}`;
+        parallelGroups.set(key, [wall1]);
+      }
+    }
+  });
+  
+  return parallelGroups;
+}
+
 export function drawWalls(
   ctx: CanvasRenderingContext2D, 
   walls: WallData[],
   showMeasurements: boolean = false
 ) {
-  console.log("\nDrawing walls:", walls.map(w => w.id));
-  
-  // Calculate total area
-  const { totalArea } = calculateAreaAndVolume(walls, []);
-  
-  // Draw all walls
+  // Draw all walls first
   walls.forEach((wall) => {
     ctx.save();
     ctx.strokeStyle = "#333";
@@ -314,59 +351,19 @@ export function drawWalls(
     }
     ctx.stroke();
     ctx.restore();
-
-    // Draw measurement if enabled
-    if (showMeasurements) {
-      const length = getDistance(wall.start, wall.end);
-      drawWallMeasurement(ctx, wall, -25, length);
-    }
   });
-}
 
-export function drawInProgressWall(
-  ctx: CanvasRenderingContext2D, 
-  wall: WallData,
-  showMeasurements: boolean = true
-) {
-  ctx.save();
-  
-  ctx.strokeStyle = "#4a90e2";
-  ctx.lineWidth = 10;
-  ctx.lineCap = "square";
-  
-  ctx.beginPath();
-  ctx.moveTo(wall.start.x, wall.start.y);
-  
-  if (wall.controlPoints && wall.controlPoints.length > 0) {
-    const start = wall.start;
-    const end = wall.end;
-    const cp = wall.controlPoints[0];
-
-    const midX = (start.x + end.x) / 2;
-    const midY = (start.y + end.y) / 2;
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const normalX = -dy / dist;
-    const normalY = dx / dist;
-
-    const cpDist = (cp.x - start.x) * normalX + (cp.y - start.y) * normalY;
-    const controlX = midX + normalX * cpDist;
-    const controlY = midY + normalY * cpDist;
-    
-    ctx.quadraticCurveTo(controlX, controlY, end.x, end.y);
-  } else {
-    ctx.lineTo(wall.end.x, wall.end.y);
-  }
-  ctx.stroke();
-  
-  // Always show measurement for in-progress wall
+  // Draw measurements if enabled
   if (showMeasurements) {
-    const length = getDistance(wall.start, wall.end);
-    drawWallMeasurement(ctx, wall, -25, length);
+    const parallelGroups = findParallelWalls(walls);
+    
+    parallelGroups.forEach((group, length) => {
+      // Only draw measurement for one wall in each parallel group
+      const wall = group[0];
+      const length = getWallLength(wall);
+      drawWallMeasurement(ctx, wall, -25, length);
+    });
   }
-  
-  ctx.restore();
 }
 
 export function drawRoomPreview(
@@ -398,17 +395,23 @@ export function drawRoomPreview(
     ctx.textAlign = 'center';
     ctx.setLineDash([]);
     
-    // Width measurement (top)
+    // Only show width and height once if they're equal
     const widthInFeet = width / PIXELS_PER_FOOT;
-    ctx.fillText(`${widthInFeet.toFixed(1)} ft`, x + width / 2, y - 10);
-    
-    // Height measurement (left side)
     const heightInFeet = height / PIXELS_PER_FOOT;
-    ctx.save();
-    ctx.translate(x - 10, y + height / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillText(`${heightInFeet.toFixed(1)} ft`, 0, 0);
-    ctx.restore();
+    
+    if (Math.abs(widthInFeet - heightInFeet) < 0.1) {
+      // If dimensions are equal, only show once at the top
+      ctx.fillText(`${widthInFeet.toFixed(1)} ft`, x + width / 2, y - 10);
+    } else {
+      // Show both dimensions if they're different
+      ctx.fillText(`${widthInFeet.toFixed(1)} ft`, x + width / 2, y - 10);
+      
+      ctx.save();
+      ctx.translate(x - 10, y + height / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(`${heightInFeet.toFixed(1)} ft`, 0, 0);
+      ctx.restore();
+    }
   }
   
   ctx.restore();
@@ -505,4 +508,50 @@ export function drawWallSegmentMeasurements(ctx: CanvasRenderingContext2D, walls
       }
     }
   });
+}
+
+export function drawInProgressWall(
+  ctx: CanvasRenderingContext2D, 
+  wall: WallData,
+  showMeasurements: boolean = true
+) {
+  ctx.save();
+  
+  ctx.strokeStyle = "#4a90e2";
+  ctx.lineWidth = 10;
+  ctx.lineCap = "square";
+  
+  ctx.beginPath();
+  ctx.moveTo(wall.start.x, wall.start.y);
+  
+  if (wall.controlPoints && wall.controlPoints.length > 0) {
+    const start = wall.start;
+    const end = wall.end;
+    const cp = wall.controlPoints[0];
+
+    const midX = (start.x + end.x) / 2;
+    const midY = (start.y + end.y) / 2;
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const normalX = -dy / dist;
+    const normalY = dx / dist;
+
+    const cpDist = (cp.x - start.x) * normalX + (cp.y - start.y) * normalY;
+    const controlX = midX + normalX * cpDist;
+    const controlY = midY + normalY * cpDist;
+    
+    ctx.quadraticCurveTo(controlX, controlY, end.x, end.y);
+  } else {
+    ctx.lineTo(wall.end.x, wall.end.y);
+  }
+  ctx.stroke();
+  
+  // Always show measurement for in-progress wall
+  if (showMeasurements) {
+    const length = getDistance(wall.start, wall.end);
+    drawWallMeasurement(ctx, wall, -25, length);
+  }
+  
+  ctx.restore();
 }
