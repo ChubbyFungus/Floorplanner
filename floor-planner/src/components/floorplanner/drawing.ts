@@ -356,13 +356,18 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: WallData[]) {
         
         // Draw measurements for each segment
         for (let i = 0; i < points.length - 1; i++) {
+          const segmentLength = getDistance(points[i], points[i + 1]);
+          
+          // Skip segments shorter than 1 pixel (effectively 0)
+          if (segmentLength < 1) continue;
+          
           const segmentWall: WallData = {
             id: wall.id + '_segment_' + i,
             start: points[i],
             end: points[i + 1],
             thickness: wall.thickness,
             controlPoints: [],
-            height: wall.height  // Add height from parent wall
+            height: wall.height
           };
           drawWallMeasurement(ctx, segmentWall, -25, undefined, walls);
         }
@@ -522,6 +527,11 @@ export function drawWallSegmentMeasurements(ctx: CanvasRenderingContext2D, walls
       
       // Draw measurements for each segment
       for (let i = 0; i < points.length - 1; i++) {
+        const segmentLength = getDistance(points[i], points[i + 1]);
+        
+        // Skip segments shorter than 1 pixel (effectively 0)
+        if (segmentLength < 1) continue;
+        
         // Create a temporary wall object for each segment
         const segmentWall: WallData = {
           id: wall.id + '_segment_' + i,
@@ -529,7 +539,7 @@ export function drawWallSegmentMeasurements(ctx: CanvasRenderingContext2D, walls
           end: points[i + 1],
           thickness: wall.thickness,
           controlPoints: [],
-          height: wall.height  // Add height from parent wall
+          height: wall.height
         };
         drawWallMeasurement(ctx, segmentWall, 25, undefined, walls);
       }
