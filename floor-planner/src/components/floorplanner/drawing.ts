@@ -9,7 +9,8 @@ import {
   getParallelWallDistance,
   isRoomBoundaryWall,
   normalizeParallelMeasurements,
-  findWallIntersections
+  findWallIntersections,
+  PIXELS_PER_FOOT
 } from "../../utils/geometryUtils";
 
 // Helper function to draw wall measurement
