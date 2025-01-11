@@ -374,6 +374,19 @@ function findUniqueWallGroups(walls: WallData[]): WallData[][] {
   return groups;
 }
 
+function findUniqueWallLengths(walls: WallData[]): Map<number, WallData> {
+  const lengthMap = new Map<number, WallData>();
+  
+  walls.forEach(wall => {
+    const length = Math.round(getWallLength(wall));
+    if (!lengthMap.has(length)) {
+      lengthMap.set(length, wall);
+    }
+  });
+  
+  return lengthMap;
+}
+
 export function drawWalls(
   ctx: CanvasRenderingContext2D, 
   walls: WallData[],
@@ -416,16 +429,9 @@ export function drawWalls(
 
   // Draw measurements if enabled
   if (showMeasurements) {
-    const wallGroups = findUniqueWallGroups(walls);
-    
-    wallGroups.forEach(group => {
-      // Only draw measurement for the first wall in each group
-      const wall = group[0];
-      const wallLength = getWallLength(wall);
-      
-      // Draw measurement slightly above horizontal walls and to the left of vertical walls
-      const offset = isHorizontal(wall) ? -25 : -40;
-      drawWallMeasurement(ctx, wall, offset, wallLength);
+    const uniqueLengths = findUniqueWallLengths(walls);
+    uniqueLengths.forEach((wall, length) => {
+      drawWallMeasurement(ctx, wall, -25, length);
     });
   }
 }
