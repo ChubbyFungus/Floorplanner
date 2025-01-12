@@ -499,50 +499,23 @@ export function drawWalls(
       const midY = (start.y + end.y) / 2;
       const dx = end.x - start.x;
       const dy = end.y - start.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const normalX = -dy / dist;
-      const normalY = dx / dist;
-
-      const cpDist = (cp.x - start.x) * normalX + (cp.y - start.y) * normalY;
-      const controlX = midX + normalX * cpDist;
-      const controlY = midY + normalY * cpDist;
       
-      ctx.quadraticCurveTo(controlX, controlY, end.x, end.y);
+      // Calculate control point for curved wall
+      const cpX = midX + cp.x * dy;
+      const cpY = midY - cp.y * dx;
+      
+      ctx.quadraticCurveTo(cpX, cpY, end.x, end.y);
     } else {
       ctx.lineTo(wall.end.x, wall.end.y);
     }
+    
     ctx.stroke();
     ctx.restore();
   });
 
   // Draw measurements if enabled
-  if (showMeasurements && walls.length > 0) {
-    console.log("\n=== Drawing Measurements ===");
-    const { bottomWall, leftWall } = findBottomAndLeftWalls(walls);
-    
-    if (bottomWall) {
-      const length = getWallLength(bottomWall);
-      console.log("Drawing bottom wall measurement:", {
-        start: bottomWall.start,
-        end: bottomWall.end,
-        length
-      });
-      drawWallMeasurement(ctx, bottomWall, 25, length); // Positive offset to show below
-    } else {
-      console.log("No bottom wall found");
-    }
-    
-    if (leftWall) {
-      const length = getWallLength(leftWall);
-      console.log("Drawing left wall measurement:", {
-        start: leftWall.start,
-        end: leftWall.end,
-        length
-      });
-      drawWallMeasurement(ctx, leftWall, -40, length); // Negative offset to show to the left
-    } else {
-      console.log("No left wall found");
-    }
+  if (showMeasurements) {
+    drawWallMeasurements(ctx, walls, true);
   }
 }
 
