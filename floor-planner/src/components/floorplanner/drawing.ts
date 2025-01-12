@@ -470,8 +470,18 @@ export function drawWalls(
   walls: WallData[],
   showMeasurements: boolean = false
 ) {
+  console.log("\n=== Drawing Walls ===");
+  console.log(`Drawing ${walls.length} walls`);
+  console.log("Wall data:", walls);
+
   // Draw all walls first
-  walls.forEach((wall) => {
+  walls.forEach((wall, index) => {
+    console.log(`Drawing wall ${index}:`, {
+      start: wall.start,
+      end: wall.end,
+      hasControlPoints: !!wall.controlPoints?.length
+    });
+
     ctx.save();
     ctx.strokeStyle = "#333";
     ctx.lineWidth = 10;
@@ -506,19 +516,32 @@ export function drawWalls(
   });
 
   // Draw measurements if enabled
-  if (showMeasurements) {
+  if (showMeasurements && walls.length > 0) {
+    console.log("\n=== Drawing Measurements ===");
     const { bottomWall, leftWall } = findBottomAndLeftWalls(walls);
     
     if (bottomWall) {
       const length = getWallLength(bottomWall);
-      console.log("Drawing bottom wall measurement:", { length });
+      console.log("Drawing bottom wall measurement:", {
+        start: bottomWall.start,
+        end: bottomWall.end,
+        length
+      });
       drawWallMeasurement(ctx, bottomWall, 25, length); // Positive offset to show below
+    } else {
+      console.log("No bottom wall found");
     }
     
     if (leftWall) {
       const length = getWallLength(leftWall);
-      console.log("Drawing left wall measurement:", { length });
+      console.log("Drawing left wall measurement:", {
+        start: leftWall.start,
+        end: leftWall.end,
+        length
+      });
       drawWallMeasurement(ctx, leftWall, -40, length); // Negative offset to show to the left
+    } else {
+      console.log("No left wall found");
     }
   }
 }
