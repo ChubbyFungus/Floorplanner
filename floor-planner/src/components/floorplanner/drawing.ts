@@ -424,10 +424,10 @@ function isOuterWall(wall: WallData, walls: WallData[]): boolean {
   }
 }
 
-function findTopAndLeftWalls(walls: WallData[]): { topWall?: WallData, leftWall?: WallData } {
-  let topWall: WallData | undefined;
+function findBottomAndLeftWalls(walls: WallData[]): { bottomWall?: WallData, leftWall?: WallData } {
+  let bottomWall: WallData | undefined;
   let leftWall: WallData | undefined;
-  let minY = Infinity;
+  let maxY = -Infinity;
   let minX = Infinity;
 
   // Debug wall count and positions
@@ -449,10 +449,10 @@ function findTopAndLeftWalls(walls: WallData[]): { topWall?: WallData, leftWall?
       }
     });
 
-    if (!isVertical && midY < minY) {
-      minY = midY;
-      topWall = wall;
-      console.log(`-> Selected as top wall (Y: ${Math.round(midY)})`);
+    if (!isVertical && midY > maxY) {
+      maxY = midY;
+      bottomWall = wall;
+      console.log(`-> Selected as bottom wall (Y: ${Math.round(midY)})`);
     }
 
     if (isVertical && midX < minX) {
@@ -462,7 +462,7 @@ function findTopAndLeftWalls(walls: WallData[]): { topWall?: WallData, leftWall?
     }
   });
 
-  return { topWall, leftWall };
+  return { bottomWall, leftWall };
 }
 
 export function drawWalls(
@@ -507,18 +507,18 @@ export function drawWalls(
 
   // Draw measurements if enabled
   if (showMeasurements) {
-    const { topWall, leftWall } = findTopAndLeftWalls(walls);
+    const { bottomWall, leftWall } = findBottomAndLeftWalls(walls);
     
-    if (topWall) {
-      const length = getWallLength(topWall);
-      console.log("Drawing top wall measurement:", { id: topWall.id, length });
-      drawWallMeasurement(ctx, topWall, -25, length);
+    if (bottomWall) {
+      const length = getWallLength(bottomWall);
+      console.log("Drawing bottom wall measurement:", { length });
+      drawWallMeasurement(ctx, bottomWall, 25, length); // Positive offset to show below
     }
     
     if (leftWall) {
       const length = getWallLength(leftWall);
-      console.log("Drawing left wall measurement:", { id: leftWall.id, length });
-      drawWallMeasurement(ctx, leftWall, -40, length);
+      console.log("Drawing left wall measurement:", { length });
+      drawWallMeasurement(ctx, leftWall, -40, length); // Negative offset to show to the left
     }
   }
 }
