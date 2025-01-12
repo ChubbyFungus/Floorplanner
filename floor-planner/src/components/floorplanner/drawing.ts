@@ -440,7 +440,7 @@ function findBottomAndLeftWalls(walls: WallData[]): { bottomWall?: WallData, lef
     const isVertical = Math.abs(wall.start.x - wall.end.x) < 1;
     const length = Math.round(getWallLength(wall));
 
-    console.log(`\nWall ${index + 1}:`, {
+    console.log("\nWall", index + 1, ":", {
       orientation: isVertical ? "vertical" : "horizontal",
       length: `${length}'`,
       position: {
@@ -452,19 +452,20 @@ function findBottomAndLeftWalls(walls: WallData[]): { bottomWall?: WallData, lef
     if (!isVertical && midY > maxY) {
       maxY = midY;
       bottomWall = wall;
-      console.log(`-> Selected as bottom wall (Y: ${Math.round(midY)})`);
+      console.log("-> Selected as bottom wall (Y:", Math.round(midY), ")");
     }
 
     if (isVertical && midX < minX) {
       minX = midX;
       leftWall = wall;
-      console.log(`-> Selected as left wall (X: ${Math.round(midX)})`);
+      console.log("-> Selected as left wall (X:", Math.round(midX), ")");
     }
   });
 
   return { bottomWall, leftWall };
 }
 
+// Draw walls with measurements
 export function drawWalls(
   ctx: CanvasRenderingContext2D, 
   walls: WallData[],
@@ -515,58 +516,114 @@ export function drawWalls(
 
   // Draw measurements if enabled
   if (showMeasurements) {
+    // Only draw top/left measurements for completed walls
     drawWallMeasurements(ctx, walls, true);
   }
 }
 
-export function drawRoomPreview(
-  ctx: CanvasRenderingContext2D, 
-  start: Point2D, 
-  end: Point2D,
-  showMeasurements: boolean = true
-) {
-  const width = Math.abs(end.x - start.x);
-  const height = Math.abs(end.y - start.y);
+// Helper functions for wall measurements
+function drawWallMeasurements(ctx: CanvasRenderingContext2D, walls: WallData[], showMeasurements: boolean) {
+  if (!showMeasurements) return;
   
-  // Draw rectangle outline
-  ctx.save();
-  ctx.strokeStyle = '#4a90e2';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([5, 5]);
+  console.log('\n=== Wall Analysis ===');
+  console.log('Total walls:', walls.length);
   
-  const x = Math.min(start.x, end.x);
-  const y = Math.min(start.y, end.y);
-  
-  ctx.beginPath();
-  ctx.rect(x, y, width, height);
-  ctx.stroke();
-  
-  // Draw dimensions if enabled
-  if (showMeasurements) {
-    ctx.font = '14px Arial';
-    ctx.fillStyle = '#333';
-    ctx.textAlign = 'center';
-    ctx.setLineDash([]);
+  // Find the leftmost vertical wall and topmost horizontal wall
+  let topWall: WallData | null = null;
+  let leftWall: WallData | null = null;
+  let minY = Infinity;
+  let minX = Infinity;
+
+  walls.forEach((wall, index) => {
+    const dx = wall.end.x - wall.start.x;
+    const dy = wall.end.y - wall.start.y;
+    const angle = Math.atan2(dy, dx);
+    const orientation = Math.abs(angle) < Math.PI / 4 || Math.abs(angle) > (3 * Math.PI) / 4 ? 'horizontal' : 'vertical';
     
-    // Only show width and height once if they're equal
-    const widthInFeet = width / PIXELS_PER_FOOT;
-    const heightInFeet = height / PIXELS_PER_FOOT;
-    
-    if (Math.abs(widthInFeet - heightInFeet) < 0.1) {
-      // If dimensions are equal, only show once at the top
-      ctx.fillText(`${widthInFeet.toFixed(1)} ft`, x + width / 2, y - 10);
-    } else {
-      // Show both dimensions if they're different
-      ctx.fillText(`${widthInFeet.toFixed(1)} ft`, x + width / 2, y - 10);
-      
-      ctx.save();
-      ctx.translate(x - 10, y + height / 2);
-      ctx.rotate(-Math.PI / 2);
-      ctx.fillText(`${heightInFeet.toFixed(1)} ft`, 0, 0);
-      ctx.restore();
+    // For horizontal walls, use the minimum Y
+    const y = Math.min(wall.start.y, wall.end.y);
+    // For vertical walls, use the minimum X
+    const x = Math.min(wall.start.x, wall.end.x);
+    // Get wall length
+    const length = getWallLength(wall);
+    const lengthInFeet = (length / PIXELS_PER_FOOT).toFixed(2);
+
+    console.log(`\nWall ${index + 1}:`, { 
+      orientation, 
+      length: lengthInFeet + "'", 
+      position: { x, y },
+      angle: (angle * 180 / Math.PI).toFixed(1) + '°',
+      start: wall.start,
+      end: wall.end
+    });
+
+    // Check if this is a horizontal wall (nearly 0° or 180°)
+    const isHorizontal = Math.abs(Math.abs(angle) - Math.PI) < Math.PI / 4 || Math.abs(angle) < Math.PI / 4;
+    // Check if this is a vertical wall (nearly 90° or 270°)
+    const isVertical = Math.abs(Math.abs(angle) - Math.PI/2) < Math.PI / 4;
+
+    console.log(`Wall ${index + 1} analysis:`, {
+      isHorizontal,
+      isVertical,
+      angle: (angle * 180 / Math.PI).toFixed(1) + '°'
+    });
+
+    if (isHorizontal) {
+      if (y < minY || (y === minY && x < (topWall?.start.x ?? Infinity))) {
+        console.log('-> Selected as top wall (Y:', y, ')');
+        topWall = wall;
+        minY = y;
+      }
+    } else if (isVertical) {
+      if (x < minX || (x === minX && y < (leftWall?.start.y ?? Infinity))) {
+        console.log('-> Selected as left wall (X:', x, ')');
+        leftWall = wall;
+        minX = x;
+      }
     }
+  });
+
+  // Draw measurements for top and left walls only
+  if (topWall) {
+    const length = getWallLength(topWall);
+    const lengthInFeet = (length / PIXELS_PER_FOOT).toFixed(2);
+    drawTopWallMeasurement(ctx, topWall, lengthInFeet);
   }
+
+  if (leftWall) {
+    const length = getWallLength(leftWall);
+    const lengthInFeet = (length / PIXELS_PER_FOOT).toFixed(2);
+    drawLeftWallMeasurement(ctx, leftWall, lengthInFeet);
+  }
+}
+
+function drawTopWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, lengthInFeet: string) {
+  console.log('Drawing top wall measurement:', { start: wall.start, end: wall.end, length: lengthInFeet });
   
+  const midX = (wall.start.x + wall.end.x) / 2;
+  const y = Math.min(wall.start.y, wall.end.y) - 25;
+
+  ctx.save();
+  ctx.font = '14px Arial';
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${lengthInFeet}'`, midX, y);
+  ctx.restore();
+}
+
+function drawLeftWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, lengthInFeet: string) {
+  console.log('Drawing left wall measurement:', { start: wall.start, end: wall.end, length: lengthInFeet });
+  
+  const x = Math.min(wall.start.x, wall.end.x) - 25;
+  const midY = (wall.start.y + wall.end.y) / 2;
+
+  ctx.save();
+  ctx.font = '14px Arial';
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'right';
+  ctx.translate(x, midY);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText(`${lengthInFeet}'`, 0, 0);
   ctx.restore();
 }
 
@@ -663,14 +720,14 @@ export function drawWallSegmentMeasurements(ctx: CanvasRenderingContext2D, walls
   });
 }
 
+// Draw in-progress wall with measurement
 export function drawInProgressWall(
   ctx: CanvasRenderingContext2D, 
   wall: WallData,
   showMeasurements: boolean = true
 ) {
   ctx.save();
-  
-  ctx.strokeStyle = "#4a90e2";
+  ctx.strokeStyle = "#333";
   ctx.lineWidth = 10;
   ctx.lineCap = "square";
   
@@ -681,23 +738,20 @@ export function drawInProgressWall(
     const start = wall.start;
     const end = wall.end;
     const cp = wall.controlPoints[0];
-
+    
     const midX = (start.x + end.x) / 2;
     const midY = (start.y + end.y) / 2;
     const dx = end.x - start.x;
     const dy = end.y - start.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const normalX = -dy / dist;
-    const normalY = dx / dist;
-
-    const cpDist = (cp.x - start.x) * normalX + (cp.y - start.y) * normalY;
-    const controlX = midX + normalX * cpDist;
-    const controlY = midY + normalY * cpDist;
     
-    ctx.quadraticCurveTo(controlX, controlY, end.x, end.y);
+    const cpX = midX + cp.x * dy;
+    const cpY = midY - cp.y * dx;
+    
+    ctx.quadraticCurveTo(cpX, cpY, end.x, end.y);
   } else {
     ctx.lineTo(wall.end.x, wall.end.y);
   }
+  
   ctx.stroke();
   
   // Always show measurement for in-progress wall
@@ -709,86 +763,56 @@ export function drawInProgressWall(
   ctx.restore();
 }
 
-export function drawWallMeasurements(ctx: CanvasRenderingContext2D, walls: WallData[], showMeasurements: boolean) {
-  if (!showMeasurements) return;
-  
-  console.log('\n=== Wall Analysis ===');
-  console.log('Total walls:', walls.length);
-  
-  // Find the topmost and leftmost walls
-  let topWall: WallData | null = null;
-  let leftWall: WallData | null = null;
-  let minY = Infinity;
-  let minX = Infinity;
-
-  walls.forEach((wall, index) => {
-    const dx = wall.end.x - wall.start.x;
-    const dy = wall.end.y - wall.start.y;
-    const length = Math.sqrt(dx * dx + dy * dy);
-    const lengthInFeet = (length / PIXELS_PER_FOOT).toFixed(2);
-    const orientation = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
-    const y = Math.min(wall.start.y, wall.end.y);
-    const x = Math.min(wall.start.x, wall.end.x);
-
-    console.log(`\nWall ${index + 1}:`, { orientation, length: lengthInFeet + "'", position: { x, y } });
-
-    if (orientation === 'horizontal') {
-      if (y < minY) {
-        console.log('-> Selected as top wall (Y:', y, ')');
-        topWall = wall;
-        minY = y;
-      }
-    } else if (orientation === 'vertical') {
-      if (x < minX) {
-        console.log('-> Selected as left wall (X:', x, ')');
-        leftWall = wall;
-        minX = x;
-      }
-    }
-  });
-
-  // Draw measurements for top and left walls only
-  if (topWall) {
-    const dx = topWall.end.x - topWall.start.x;
-    const length = Math.sqrt(dx * dx);
-    const lengthInFeet = (length / PIXELS_PER_FOOT).toFixed(2);
-    drawTopWallMeasurement(ctx, topWall, lengthInFeet);
-  }
-
-  if (leftWall) {
-    const dy = leftWall.end.y - leftWall.start.y;
-    const length = Math.sqrt(dy * dy);
-    const lengthInFeet = (length / PIXELS_PER_FOOT).toFixed(2);
-    drawLeftWallMeasurement(ctx, leftWall, lengthInFeet);
-  }
-}
-
-function drawTopWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, lengthInFeet: string) {
-  console.log('Drawing top wall measurement:', { start: wall.start, end: wall.end, length: lengthInFeet });
-  
-  const midX = (wall.start.x + wall.end.x) / 2;
-  const y = Math.min(wall.start.y, wall.end.y) - 10;
-
+// Draw room preview with measurements
+export function drawRoomPreview(
+  ctx: CanvasRenderingContext2D, 
+  start: Point2D, 
+  end: Point2D,
+  showMeasurements: boolean = true
+) {
   ctx.save();
-  ctx.font = '14px Arial';
-  ctx.fillStyle = '#000';
-  ctx.textAlign = 'center';
-  ctx.fillText(`${lengthInFeet}'`, midX, y);
-  ctx.restore();
-}
-
-function drawLeftWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, lengthInFeet: string) {
-  console.log('Drawing left wall measurement:', { start: wall.start, end: wall.end, length: lengthInFeet });
   
-  const x = Math.min(wall.start.x, wall.end.x) - 10;
-  const midY = (wall.start.y + wall.end.y) / 2;
-
-  ctx.save();
-  ctx.font = '14px Arial';
-  ctx.fillStyle = '#000';
-  ctx.textAlign = 'right';
-  ctx.translate(x, midY);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText(`${lengthInFeet}'`, 0, 0);
+  // Draw preview rectangle
+  ctx.strokeStyle = "#4a90e2";
+  ctx.lineWidth = 10;
+  ctx.lineCap = "square";
+  
+  ctx.beginPath();
+  ctx.moveTo(start.x, start.y);
+  ctx.lineTo(end.x, start.y);
+  ctx.lineTo(end.x, end.y);
+  ctx.lineTo(start.x, end.y);
+  ctx.lineTo(start.x, start.y);
+  ctx.stroke();
+  
+  // Show measurements for preview
+  if (showMeasurements) {
+    const width = Math.abs(end.x - start.x);
+    const height = Math.abs(end.y - start.y);
+    
+    // Create temporary wall objects for measurements
+    const topWall: WallData = {
+      id: 'preview_top',
+      start: { x: Math.min(start.x, end.x), y: Math.min(start.y, end.y) },
+      end: { x: Math.max(start.x, end.x), y: Math.min(start.y, end.y) },
+      thickness: 10,
+      controlPoints: [],
+      height: 10
+    };
+    
+    const leftWall: WallData = {
+      id: 'preview_left',
+      start: { x: Math.min(start.x, end.x), y: Math.min(start.y, end.y) },
+      end: { x: Math.min(start.x, end.x), y: Math.max(start.y, end.y) },
+      thickness: 10,
+      controlPoints: [],
+      height: 10
+    };
+    
+    // Draw measurements for preview walls
+    drawTopWallMeasurement(ctx, topWall, (width / PIXELS_PER_FOOT).toFixed(2));
+    drawLeftWallMeasurement(ctx, leftWall, (height / PIXELS_PER_FOOT).toFixed(2));
+  }
+  
   ctx.restore();
 }
