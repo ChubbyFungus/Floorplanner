@@ -387,6 +387,84 @@ function findUniqueWallLengths(walls: WallData[]): Map<number, WallData> {
   return lengthMap;
 }
 
+function isOuterWall(wall: WallData, walls: WallData[]): boolean {
+  // Get the midpoint of the wall
+  const midX = (wall.start.x + wall.end.x) / 2;
+  const midY = (wall.start.y + wall.end.y) / 2;
+  
+  // Check if this is a vertical wall
+  const isVertical = Math.abs(wall.start.x - wall.end.x) < 1;
+  
+  if (isVertical) {
+    // For vertical walls, check if there are any walls to the left or right
+    const hasWallLeft = walls.some(w => {
+      const otherMidX = (w.start.x + w.end.x) / 2;
+      return w !== wall && otherMidX < midX && Math.abs(w.start.y - midY) < 1;
+    });
+    
+    const hasWallRight = walls.some(w => {
+      const otherMidX = (w.start.x + w.end.x) / 2;
+      return w !== wall && otherMidX > midX && Math.abs(w.start.y - midY) < 1;
+    });
+    
+    return !hasWallLeft || !hasWallRight;
+  } else {
+    // For horizontal walls, check if there are any walls above or below
+    const hasWallAbove = walls.some(w => {
+      const otherMidY = (w.start.y + w.end.y) / 2;
+      return w !== wall && otherMidY < midY && Math.abs(w.start.x - midX) < 1;
+    });
+    
+    const hasWallBelow = walls.some(w => {
+      const otherMidY = (w.start.y + w.end.y) / 2;
+      return w !== wall && otherMidY > midY && Math.abs(w.start.x - midX) < 1;
+    });
+    
+    return !hasWallAbove || !hasWallBelow;
+  }
+}
+
+function findTopAndLeftWalls(walls: WallData[]): { topWall?: WallData, leftWall?: WallData } {
+  let topWall: WallData | undefined;
+  let leftWall: WallData | undefined;
+  let minY = Infinity;
+  let minX = Infinity;
+
+  // Debug wall count and positions
+  console.log("\n=== Wall Analysis ===");
+  console.log(`Total walls: ${walls.length}`);
+  
+  walls.forEach((wall, index) => {
+    const midY = (wall.start.y + wall.end.y) / 2;
+    const midX = (wall.start.x + wall.end.x) / 2;
+    const isVertical = Math.abs(wall.start.x - wall.end.x) < 1;
+    const length = Math.round(getWallLength(wall));
+
+    console.log(`\nWall ${index + 1}:`, {
+      orientation: isVertical ? "vertical" : "horizontal",
+      length: `${length}'`,
+      position: {
+        midX: Math.round(midX),
+        midY: Math.round(midY)
+      }
+    });
+
+    if (!isVertical && midY < minY) {
+      minY = midY;
+      topWall = wall;
+      console.log(`-> Selected as top wall (Y: ${Math.round(midY)})`);
+    }
+
+    if (isVertical && midX < minX) {
+      minX = midX;
+      leftWall = wall;
+      console.log(`-> Selected as left wall (X: ${Math.round(midX)})`);
+    }
+  });
+
+  return { topWall, leftWall };
+}
+
 export function drawWalls(
   ctx: CanvasRenderingContext2D, 
   walls: WallData[],
@@ -429,10 +507,19 @@ export function drawWalls(
 
   // Draw measurements if enabled
   if (showMeasurements) {
-    const uniqueLengths = findUniqueWallLengths(walls);
-    uniqueLengths.forEach((wall, length) => {
-      drawWallMeasurement(ctx, wall, -25, length);
-    });
+    const { topWall, leftWall } = findTopAndLeftWalls(walls);
+    
+    if (topWall) {
+      const length = getWallLength(topWall);
+      console.log("Drawing top wall measurement:", { id: topWall.id, length });
+      drawWallMeasurement(ctx, topWall, -25, length);
+    }
+    
+    if (leftWall) {
+      const length = getWallLength(leftWall);
+      console.log("Drawing left wall measurement:", { id: leftWall.id, length });
+      drawWallMeasurement(ctx, leftWall, -40, length);
+    }
   }
 }
 
