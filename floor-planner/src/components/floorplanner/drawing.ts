@@ -735,3 +735,87 @@ export function drawInProgressWall(
   
   ctx.restore();
 }
+
+export function drawWallMeasurements(ctx: CanvasRenderingContext2D, walls: WallData[], showMeasurements: boolean) {
+  if (!showMeasurements) return;
+  
+  console.log('\n=== Wall Analysis ===');
+  console.log('Total walls:', walls.length);
+  
+  // Find the topmost and leftmost walls
+  let topWall: WallData | null = null;
+  let leftWall: WallData | null = null;
+  let minY = Infinity;
+  let minX = Infinity;
+
+  walls.forEach((wall, index) => {
+    const dx = wall.end.x - wall.start.x;
+    const dy = wall.end.y - wall.start.y;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    const lengthInFeet = (length / PIXELS_PER_FOOT).toFixed(2);
+    const orientation = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
+    const y = Math.min(wall.start.y, wall.end.y);
+    const x = Math.min(wall.start.x, wall.end.x);
+
+    console.log(`\nWall ${index + 1}:`, { orientation, length: lengthInFeet + "'", position: { x, y } });
+
+    if (orientation === 'horizontal') {
+      if (y < minY) {
+        console.log('-> Selected as top wall (Y:', y, ')');
+        topWall = wall;
+        minY = y;
+      }
+    } else if (orientation === 'vertical') {
+      if (x < minX) {
+        console.log('-> Selected as left wall (X:', x, ')');
+        leftWall = wall;
+        minX = x;
+      }
+    }
+  });
+
+  // Draw measurements for top and left walls only
+  if (topWall) {
+    const dx = topWall.end.x - topWall.start.x;
+    const length = Math.sqrt(dx * dx);
+    const lengthInFeet = (length / PIXELS_PER_FOOT).toFixed(2);
+    drawTopWallMeasurement(ctx, topWall, lengthInFeet);
+  }
+
+  if (leftWall) {
+    const dy = leftWall.end.y - leftWall.start.y;
+    const length = Math.sqrt(dy * dy);
+    const lengthInFeet = (length / PIXELS_PER_FOOT).toFixed(2);
+    drawLeftWallMeasurement(ctx, leftWall, lengthInFeet);
+  }
+}
+
+function drawTopWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, lengthInFeet: string) {
+  console.log('Drawing top wall measurement:', { start: wall.start, end: wall.end, length: lengthInFeet });
+  
+  const midX = (wall.start.x + wall.end.x) / 2;
+  const y = Math.min(wall.start.y, wall.end.y) - 10;
+
+  ctx.save();
+  ctx.font = '14px Arial';
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${lengthInFeet}'`, midX, y);
+  ctx.restore();
+}
+
+function drawLeftWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, lengthInFeet: string) {
+  console.log('Drawing left wall measurement:', { start: wall.start, end: wall.end, length: lengthInFeet });
+  
+  const x = Math.min(wall.start.x, wall.end.x) - 10;
+  const midY = (wall.start.y + wall.end.y) / 2;
+
+  ctx.save();
+  ctx.font = '14px Arial';
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'right';
+  ctx.translate(x, midY);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText(`${lengthInFeet}'`, 0, 0);
+  ctx.restore();
+}
