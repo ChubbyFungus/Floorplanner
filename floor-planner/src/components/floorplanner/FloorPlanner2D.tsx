@@ -251,12 +251,18 @@ export const FloorPlanner2D: React.FC = () => {
     if (!canvasRef.current) return;
 
     const point = getMousePosition(e);
-    console.log('Canvas clicked:', { point, selectedTool, wallInProgress, wallCount: walls.length });
+    console.log('Canvas clicked:', { 
+      point, 
+      selectedTool, 
+      wallInProgress, 
+      wallCount: walls.length,
+      walls
+    });
 
     if (selectedTool === 'wall') {
       console.log('Wall tool active');
       if (wallInProgress) {
-        console.log('Wall in progress');
+        console.log('Wall in progress:', wallInProgress);
         if (isAltPressed) {
           console.log('Alt pressed, adding control point');
           dispatch(addWallControlPoint(point));
@@ -264,10 +270,12 @@ export const FloorPlanner2D: React.FC = () => {
           console.log('Creating wall section');
           // First snap to angle
           const snappedPoint = snapAngle(wallInProgress.start, point);
+          console.log('Snapped point:', snappedPoint);
           
           // Then check if we're near any wall or endpoint
           const nearestPoint = findNearestWallPoint(snappedPoint, walls);
           const finalPoint = nearestPoint || snappedPoint;
+          console.log('Final point:', finalPoint);
           
           const newWall = {
             id: uuidv4(),
@@ -296,8 +304,8 @@ export const FloorPlanner2D: React.FC = () => {
         // For the first click, also try to snap to existing walls
         const nearestPoint = findNearestWallPoint(point, walls);
         const startPoint = nearestPoint || point;
+        console.log('Starting new wall at:', startPoint);
         dispatch(startWall(startPoint));
-        console.log('Started new wall at:', startPoint);
       }
     } else if (selectedTool === 'room') {
       console.log(`Selected tool: ${selectedTool} (Room tool)`);
@@ -329,6 +337,8 @@ export const FloorPlanner2D: React.FC = () => {
         }));
         setRoomStart(null);
       }
+    } else {
+      console.log('No tool selected');
     }
   }, [dispatch, wallInProgress, isAltPressed, snapAngle, selectedTool, roomStart, getMousePosition, walls]);
 
