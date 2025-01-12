@@ -144,7 +144,7 @@ export const FloorPlanner: React.FC = () => {
 
       <Box mb={2}>
         <Typography variant="body1">
-          Total Area: {Math.round(dimensions.totalArea / (50 * 50))} sq ft
+          Total Area: {Math.round(dimensions.totalArea)} sq ft
         </Typography>
       </Box>
 

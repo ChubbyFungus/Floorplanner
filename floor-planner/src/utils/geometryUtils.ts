@@ -136,17 +136,29 @@ function subdivideWallsIntoPolygon(wallLoop: WallData[]): Point2D[] {
   wallLoop.forEach(wall => {
     const width = Math.abs(wall.end.x - wall.start.x);
     const height = Math.abs(wall.end.y - wall.start.y);
-    console.log(`Wall dimensions in pixels: ${width} x ${height}`);
-    console.log(`Wall dimensions in feet: ${width/PIXELS_PER_FOOT} x ${height/PIXELS_PER_FOOT}`);
+    const length = Math.sqrt(width * width + height * height);
+    console.log(`Wall dimensions - pixels: ${length}, feet: ${length/PIXELS_PER_FOOT}`);
   });
   
-  wallLoop.forEach((wall, idx) => {
-    const wallPoints = subdivideWall(wall);
-    if (idx < wallLoop.length - 1) {
-      wallPoints.pop();
+  // Ensure walls are connected in sequence
+  for (let i = 0; i < wallLoop.length; i++) {
+    const wall = wallLoop[i];
+    const nextWall = wallLoop[(i + 1) % wallLoop.length];
+    
+    if (!arePointsEqual(wall.end, nextWall.start)) {
+      console.warn(`Gap between walls at index ${i}:`, {
+        currentWallEnd: wall.end,
+        nextWallStart: nextWall.start
+      });
     }
-    points.push(...wallPoints);
-  });
+    
+    points.push(wall.start);
+  }
+  
+  // Add the first point again to close the loop
+  if (points.length > 0) {
+    points.push(points[0]);
+  }
   
   return points;
 }
@@ -164,17 +176,30 @@ function subdivideWall(wall: WallData): Point2D[] {
 function polygonArea(points: Point2D[]): number {
   if (points.length < 3) return 0;
   
-  // Use simple shoelace formula for rectangles
+  // Ensure points are ordered correctly (clockwise)
+  const center = points.reduce((acc, p) => ({ 
+    x: acc.x + p.x / points.length, 
+    y: acc.y + p.y / points.length 
+  }), { x: 0, y: 0 });
+  
+  const sortedPoints = [...points].sort((a, b) => {
+    const angleA = Math.atan2(a.y - center.y, a.x - center.x);
+    const angleB = Math.atan2(b.y - center.y, b.x - center.x);
+    return angleA - angleB;
+  });
+  
+  // Use shoelace formula with sorted points
   let area = 0;
-  for (let i = 0; i < points.length; i++) {
-    const j = (i + 1) % points.length;
-    area += points[i].x * points[j].y;
-    area -= points[j].x * points[i].y;
+  for (let i = 0; i < sortedPoints.length; i++) {
+    const j = (i + 1) % sortedPoints.length;
+    area += sortedPoints[i].x * sortedPoints[j].y;
+    area -= sortedPoints[j].x * sortedPoints[i].y;
   }
   
   area = Math.abs(area / 2);
   console.log('Polygon area calculation:');
-  console.log('Points:', points);
+  console.log('Original points:', points);
+  console.log('Sorted points:', sortedPoints);
   console.log('Raw area:', area);
   console.log('Area in sq ft:', area / (PIXELS_PER_FOOT * PIXELS_PER_FOOT));
   

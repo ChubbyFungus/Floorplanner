@@ -57,44 +57,21 @@ export const FloorPlanner2D: React.FC = () => {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw existing walls
+    // Draw existing walls with measurements (if enabled)
     drawWalls(ctx, walls, showMeasurements);
-
-    // Draw wall segment measurements
-    if (showMeasurements) {
-      drawWallSegmentMeasurements(ctx, walls);
-    }
 
     // Draw wall in progress
     if (wallInProgress) {
       drawInProgressWall(ctx, wallInProgress, showMeasurements);
-
-      // Draw dynamic measurements and angle
-      ctx.font = '14px Arial';
-      ctx.fillStyle = '#333';
-      ctx.textAlign = 'center';
-
-      // Calculate distance
-      const dx = mousePos.x - wallInProgress.start.x;
-      const dy = mousePos.y - wallInProgress.start.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      const midX = (wallInProgress.start.x + mousePos.x) / 2;
-      const midY = (wallInProgress.start.y + mousePos.y) / 2;
-      ctx.fillText(`${Math.round(distance)}px`, midX, midY - 10);
-
-      // Calculate angle
-      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-      const normalizedAngle = ((angle % 360) + 360) % 360;
-      ctx.fillText(`${Math.round(normalizedAngle)}°`, midX, midY + 20);
     }
 
-    // Draw room preview
-    if (roomStart && selectedTool === 'room') {
+    // Draw room preview if in room tool mode
+    if (selectedTool === 'room' && roomStart && mousePos) {
       drawRoomPreview(ctx, roomStart, mousePos, showMeasurements);
     }
 
     ctx.restore();
-  }, [walls, wallInProgress, roomStart, selectedTool, mousePos, showMeasurements]);
+  }, [walls, wallInProgress, showMeasurements, selectedTool, roomStart, mousePos]);
 
   // Canvas setup effect
   useEffect(() => {
