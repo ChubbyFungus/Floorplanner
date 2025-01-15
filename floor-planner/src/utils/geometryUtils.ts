@@ -21,31 +21,60 @@ export function calculateAreaAndVolume(
   walls: WallData[],
   fixtures: FixtureData[]
 ): CalcResult {
-  const loops = findAllLoops(walls);
-  let totalRawArea = 0;
+  console.log('\n=== Starting Area Calculation ===');
+  const wallLoops = findAllLoops(walls);
+  console.log(`Found ${wallLoops.length} room loops`);
 
-  loops.forEach((loop, index) => {
-    console.log(`\nProcessing Loop ${index}:`);
+  // Calculate area for each loop and track which rooms are inside others
+  interface RoomInfo {
+    area: number;
+    containedBy: number[]; // indices of rooms that contain this room
+  }
+  const roomInfos: RoomInfo[] = [];
+  
+  wallLoops.forEach((loop, index) => {
+    console.log(`\nAnalyzing Loop ${index}:`);
     const polygonPoints = subdivideWallsIntoPolygon(loop);
+    const areaInPixels = polygonArea(polygonPoints);
     
-    // Log the polygon points
-    console.log('Polygon points:');
-    polygonPoints.forEach((p, i) => {
-      console.log(`Point ${i}: (${p.x}, ${p.y})`);
+    // Check which rooms contain this room
+    const containedBy: number[] = [];
+    for (let i = 0; i < index; i++) {
+      if (!isLoopSeparate(wallLoops[i], loop)) {  // Check if loop[i] is inside current loop
+        console.log(`Loop ${index} is contained within loop ${i}`);
+        containedBy.push(i);
+      }
+    }
+    
+    roomInfos.push({
+      area: areaInPixels,
+      containedBy
     });
     
-    const loopArea = polygonArea(polygonPoints);
-    console.log(`Loop ${index} area in pixels²: ${loopArea}`);
-    console.log(`Loop ${index} area in sq ft: ${loopArea / (PIXELS_PER_FOOT * PIXELS_PER_FOOT)}`);
-    totalRawArea += loopArea;
+    console.log(`Loop ${index} area: ${areaInPixels} pixels² (${areaInPixels / (PIXELS_PER_FOOT * PIXELS_PER_FOOT)} sq ft)`);
+    console.log(`Contained by rooms:`, containedBy);
+  });
+
+  // Calculate total area by only adding separate rooms
+  let totalRawArea = 0;
+  roomInfos.forEach((info, index) => {
+    if (info.containedBy.length === 0) {
+      // This is a separate room - add its area
+      console.log(`Adding separate room ${index} area: ${info.area}`);
+      totalRawArea += info.area;
+    } else {
+      console.log(`Skipping nested room ${index} area: ${info.area}`);
+    }
   });
 
   console.log('\nFinal calculations:');
   console.log('Total raw area in pixels²:', totalRawArea);
+  
+  // Convert area to square feet
   const totalAreaInSqFeet = totalRawArea / (PIXELS_PER_FOOT * PIXELS_PER_FOOT);
-  console.log('Final area in sq ft:', totalAreaInSqFeet);
+  console.log('Total area in sq ft:', totalAreaInSqFeet);
 
-  // average height
+  // Calculate average height for volume (in feet)
   const avgHeight =
     walls.reduce((acc, w) => acc + w.height, 0) / (walls.length || 1);
 
@@ -546,4 +575,95 @@ function getWallAngle(wall1: WallData, wall2: WallData): number {
   const angle1 = Math.atan2(wall1.end.y - wall1.start.y, wall1.end.x - wall1.start.x);
   const angle2 = Math.atan2(wall2.end.y - wall2.start.y, wall2.end.x - wall2.start.x);
   return Math.abs(angle1 - angle2);
+}
+
+// Helper function to determine if one loop is separate from another
+function isLoopSeparate(loop1: WallData[], loop2: WallData[]): boolean {
+  console.log('\nChecking if loops are separate:');
+  
+  // Get points for both loops
+  const points1 = subdivideWallsIntoPolygon(loop1);
+  const points2 = subdivideWallsIntoPolygon(loop2);
+  
+  // First check if they share any walls
+  const sharedWalls = findSharedWalls(loop1, loop2);
+  console.log('Number of shared walls:', sharedWalls.length);
+  
+  // If they share walls, check if the non-shared points of loop2 are inside loop1
+  if (sharedWalls.length > 0) {
+    // Get points that aren't part of shared walls
+    const nonSharedPoints2 = points2.filter(p2 => 
+      !sharedWalls.some(wall => 
+        arePointsEqual(p2, wall.start) || arePointsEqual(p2, wall.end)
+      )
+    );
+    
+    console.log('Non-shared points from loop2:', nonSharedPoints2.length);
+    
+    // If any non-shared point is outside loop1, then loop2 is separate
+    const anyPointOutside = nonSharedPoints2.some(p => !isPointInPolygon(p, points1));
+    console.log('Has points outside:', anyPointOutside);
+    
+    // If all points are inside, it's nested. If any are outside, it's separate
+    return anyPointOutside;
+  }
+  
+  // If no shared walls, use the original point-inside check
+  let points1Inside = 0;
+  let points2Inside = 0;
+  
+  for (const point of points1) {
+    if (isPointInPolygon(point, points2)) {
+      points1Inside++;
+    }
+  }
+  
+  for (const point of points2) {
+    if (isPointInPolygon(point, points1)) {
+      points2Inside++;
+    }
+  }
+  
+  console.log(`Points from loop1 inside loop2: ${points1Inside}/${points1.length}`);
+  console.log(`Points from loop2 inside loop1: ${points2Inside}/${points2.length}`);
+  
+  // Loops are separate if less than 2 points from loop2 are inside loop1
+  const isSeparate = points2Inside < 2;
+  
+  console.log('Loops are separate:', isSeparate);
+  
+  return isSeparate;
+}
+
+// Helper function to find walls that are shared between two loops
+function findSharedWalls(loop1: WallData[], loop2: WallData[]): WallData[] {
+  const sharedWalls: WallData[] = [];
+  
+  for (const wall1 of loop1) {
+    for (const wall2 of loop2) {
+      // Check if walls share both endpoints (in either direction)
+      if ((arePointsEqual(wall1.start, wall2.start) && arePointsEqual(wall1.end, wall2.end)) ||
+          (arePointsEqual(wall1.start, wall2.end) && arePointsEqual(wall1.end, wall2.start))) {
+        sharedWalls.push(wall1);
+        break;
+      }
+    }
+  }
+  
+  return sharedWalls;
+}
+
+// Helper function to check if a point is inside a polygon
+function isPointInPolygon(point: Point2D, polygon: Point2D[]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y;
+    const xj = polygon[j].x, yj = polygon[j].y;
+    
+    const intersect = ((yi > point.y) !== (yj > point.y))
+        && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  
+  return inside;
 }
