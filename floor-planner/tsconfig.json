@@ -19,18 +19,14 @@
     "outDir": "dist",
     "rootDir": "src",
     "sourceMap": true,
-    "types": [
-      "node",
-      "react",
-      "react-dom",
-      "jest",
-      "testing-library__jest-dom"
-    ],
     "typeRoots": [
       "./node_modules/@types",
       "./src/types"
     ]
   },
-  "include": ["src/**/*"],
+  "include": [
+    "src/**/*",
+    "src/setupTests.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

@@ -667,3 +667,15 @@ function isPointInPolygon(point: Point2D, polygon: Point2D[]): boolean {
   
   return inside;
 }
+
+// Add utility function for curve creation
+export const createCurvedWall = (
+  wall: WallData,
+  controlPoint: Point2D
+): WallData => {
+  return {
+    ...wall,
+    controlPoints: [controlPoint],
+    type: 'curved'
+  };
+};

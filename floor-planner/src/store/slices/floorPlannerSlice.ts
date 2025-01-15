@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { WallData, FixtureData, FloorPlannerState } from "../../types";
+import { WallData, FixtureData, FloorPlannerState, Point2D } from "../../types";
 import { v4 as uuidv4 } from "uuid";
 
 // Ensure your FloorPlannerState is defined in src/types/index.ts, for example:
@@ -151,6 +151,41 @@ export const floorPlannerSlice = createSlice({
       }
       state.wallInProgress = null;
     },
+
+    // --------------------------------
+    // 8) Wall Splitting
+    // --------------------------------
+    splitWall: (state, action: PayloadAction<{
+      wallId: string,
+      splitPoint: Point2D
+    }>) => {
+      const { wallId, splitPoint } = action.payload;
+      const wallIndex = state.walls.findIndex(w => w.id === wallId);
+
+      if (wallIndex === -1) return;
+
+      const originalWall = state.walls[wallIndex];
+
+      // Create two new walls from split point
+      const wall1: WallData = {
+        id: crypto.randomUUID(),
+        start: originalWall.start,
+        end: splitPoint,
+        thickness: originalWall.thickness,
+        height: originalWall.height
+      };
+
+      const wall2: WallData = {
+        id: crypto.randomUUID(),
+        start: splitPoint,
+        end: originalWall.end,
+        thickness: originalWall.thickness,
+        height: originalWall.height
+      };
+
+      // Replace original wall with split walls
+      state.walls.splice(wallIndex, 1, wall1, wall2);
+    }
   }
 });
 
@@ -173,6 +208,7 @@ export const {
   saveState,
   clearCanvas,
   endWallDrawing,
+  splitWall,
 } = floorPlannerSlice.actions;
 
 export default floorPlannerSlice.reducer;

@@ -473,19 +473,62 @@ export function drawWalls(
 ) {
   console.log("\n=== Drawing Walls ===");
   console.log(`Drawing ${walls.length} walls`);
-  console.log("Wall data:", walls);
+  console.log("Show measurements:", showMeasurements);
+
+  // Get DPI scale
+  const dpr = window.devicePixelRatio || 1;
+  const scale = 1 / dpr;
+  console.log("DPI scale:", dpr, "Adjusted scale:", scale);
+
+  // Find the outermost walls
+  let minX = Infinity, maxX = -Infinity;
+  let minY = Infinity, maxY = -Infinity;
+  let topWall: WallData | null = null;
+  let leftWall: WallData | null = null;
+
+  walls.forEach(wall => {
+    const x1 = wall.start.x;
+    const x2 = wall.end.x;
+    const y1 = wall.start.y;
+    const y2 = wall.end.y;
+
+    // Update bounds
+    minX = Math.min(minX, x1, x2);
+    maxX = Math.max(maxX, x1, x2);
+    minY = Math.min(minY, y1, y2);
+    maxY = Math.max(maxY, y1, y2);
+
+    // Check if this is a potential top or left wall
+    if (Math.min(y1, y2) === minY) {
+      if (!topWall || Math.abs(x2 - x1) > Math.abs(topWall.end.x - topWall.start.x)) {
+        topWall = wall;
+      }
+    }
+    if (Math.min(x1, x2) === minX) {
+      if (!leftWall || Math.abs(y2 - y1) > Math.abs(leftWall.end.y - leftWall.start.y)) {
+        leftWall = wall;
+      }
+    }
+  });
+
+  console.log("Found walls:", {
+    topWall: topWall ? {
+      start: topWall.start,
+      end: topWall.end,
+      length: getWallLength(topWall)
+    } : null,
+    leftWall: leftWall ? {
+      start: leftWall.start,
+      end: leftWall.end,
+      length: getWallLength(leftWall)
+    } : null
+  });
 
   // Draw all walls first
   walls.forEach((wall, index) => {
-    console.log(`Drawing wall ${index}:`, {
-      start: wall.start,
-      end: wall.end,
-      hasControlPoints: !!wall.controlPoints?.length
-    });
-
     ctx.save();
     ctx.strokeStyle = "#333";
-    ctx.lineWidth = 10;
+    ctx.lineWidth = wall.thickness * scale;
     ctx.lineCap = "square";
     
     ctx.beginPath();
@@ -495,17 +538,7 @@ export function drawWalls(
       const start = wall.start;
       const end = wall.end;
       const cp = wall.controlPoints[0];
-
-      const midX = (start.x + end.x) / 2;
-      const midY = (start.y + end.y) / 2;
-      const dx = end.x - start.x;
-      const dy = end.y - start.y;
-      
-      // Calculate control point for curved wall
-      const cpX = midX + cp.x * dy;
-      const cpY = midY - cp.y * dx;
-      
-      ctx.quadraticCurveTo(cpX, cpY, end.x, end.y);
+      ctx.quadraticCurveTo(cp.x, cp.y, end.x, end.y);
     } else {
       ctx.lineTo(wall.end.x, wall.end.y);
     }
@@ -515,10 +548,183 @@ export function drawWalls(
   });
 
   // Draw measurements if enabled
-  if (showMeasurements) {
-    // Only draw top/left measurements for completed walls
-    drawWallMeasurements(ctx, walls, true);
+  if (showMeasurements && topWall && leftWall) {
+    console.log("Drawing measurements");
+    
+    // Draw top wall measurement
+    const topLength = getWallLength(topWall);
+    const topLengthInFeet = (topLength / PIXELS_PER_FOOT).toFixed(2);
+    console.log("Top wall measurement:", {
+      length: topLength,
+      lengthInFeet: topLengthInFeet,
+      offset: -60 * scale
+    });
+    
+    drawDimensionLine(
+      ctx,
+      topWall.start,
+      topWall.end,
+      -60 * scale,
+      `${topLengthInFeet}'`
+    );
+
+    // Draw left wall measurement
+    const leftLength = getWallLength(leftWall);
+    const leftLengthInFeet = (leftLength / PIXELS_PER_FOOT).toFixed(2);
+    console.log("Left wall measurement:", {
+      length: leftLength,
+      lengthInFeet: leftLengthInFeet,
+      offset: -60 * scale
+    });
+    
+    drawDimensionLine(
+      ctx,
+      leftWall.start,
+      leftWall.end,
+      -60 * scale,
+      `${leftLengthInFeet}'`
+    );
+  } else {
+    console.log("Skipping measurements:", {
+      showMeasurements,
+      hasTopWall: !!topWall,
+      hasLeftWall: !!leftWall
+    });
   }
+}
+
+function drawDimensionLine(
+  ctx: CanvasRenderingContext2D,
+  start: Point2D,
+  end: Point2D,
+  offset: number,
+  measurement: string
+) {
+  console.log("Drawing dimension line:", {
+    start,
+    end,
+    offset,
+    measurement
+  });
+
+  const dpr = window.devicePixelRatio || 1;
+  const scale = 1 / dpr;
+  
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const angle = Math.atan2(dy, dx);
+  
+  // Calculate offset direction perpendicular to wall
+  const offsetX = -Math.sin(angle) * offset;
+  const offsetY = Math.cos(angle) * offset;
+  
+  // Calculate points for dimension line
+  const dimStart = {
+    x: start.x + offsetX,
+    y: start.y + offsetY
+  };
+  const dimEnd = {
+    x: end.x + offsetX,
+    y: end.y + offsetY
+  };
+
+  console.log("Dimension line points:", {
+    dimStart,
+    dimEnd,
+    angle: angle * (180 / Math.PI)
+  });
+  
+  ctx.save();
+  
+  // Draw extension lines
+  ctx.beginPath();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1 * scale;
+  ctx.setLineDash([4 * scale, 4 * scale]);
+  
+  // Start extension
+  ctx.moveTo(start.x, start.y);
+  ctx.lineTo(dimStart.x, dimStart.y);
+  
+  // End extension
+  ctx.moveTo(end.x, end.y);
+  ctx.lineTo(dimEnd.x, dimEnd.y);
+  ctx.stroke();
+  
+  // Draw dimension line
+  ctx.beginPath();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1 * scale;
+  ctx.setLineDash([]);
+  ctx.moveTo(dimStart.x, dimStart.y);
+  ctx.lineTo(dimEnd.x, dimEnd.y);
+  ctx.stroke();
+  
+  // Draw arrows
+  const arrowSize = 10 * scale;
+  ctx.fillStyle = '#000';
+  
+  // Start arrow
+  ctx.beginPath();
+  ctx.moveTo(dimStart.x, dimStart.y);
+  ctx.lineTo(
+    dimStart.x + Math.cos(angle - Math.PI / 6) * arrowSize,
+    dimStart.y + Math.sin(angle - Math.PI / 6) * arrowSize
+  );
+  ctx.lineTo(
+    dimStart.x + Math.cos(angle + Math.PI / 6) * arrowSize,
+    dimStart.y + Math.sin(angle + Math.PI / 6) * arrowSize
+  );
+  ctx.closePath();
+  ctx.fill();
+  
+  // End arrow
+  ctx.beginPath();
+  ctx.moveTo(dimEnd.x, dimEnd.y);
+  ctx.lineTo(
+    dimEnd.x - Math.cos(angle - Math.PI / 6) * arrowSize,
+    dimEnd.y - Math.sin(angle - Math.PI / 6) * arrowSize
+  );
+  ctx.lineTo(
+    dimEnd.x - Math.cos(angle + Math.PI / 6) * arrowSize,
+    dimEnd.y - Math.sin(angle + Math.PI / 6) * arrowSize
+  );
+  ctx.closePath();
+  ctx.fill();
+  
+  // Draw measurement text
+  const midX = (dimStart.x + dimEnd.x) / 2;
+  const midY = (dimStart.y + dimEnd.y) / 2;
+  
+  ctx.save();
+  ctx.translate(midX, midY);
+  if (Math.abs(angle) > Math.PI / 2) {
+    ctx.rotate(angle - Math.PI);
+  } else {
+    ctx.rotate(angle);
+  }
+  
+  // Draw text background
+  ctx.font = `bold ${14 * scale}px Arial`;
+  const textMetrics = ctx.measureText(measurement);
+  const padding = 4 * scale;
+  
+  ctx.fillStyle = 'white';
+  ctx.fillRect(
+    -textMetrics.width/2 - padding,
+    -10 * scale - padding,
+    textMetrics.width + padding * 2,
+    20 * scale + padding * 2
+  );
+  
+  // Draw text
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(measurement, 0, 0);
+  
+  ctx.restore();
+  ctx.restore();
 }
 
 // Helper functions for wall measurements
@@ -538,93 +744,54 @@ function drawWallMeasurements(ctx: CanvasRenderingContext2D, walls: WallData[], 
     const dx = wall.end.x - wall.start.x;
     const dy = wall.end.y - wall.start.y;
     const angle = Math.atan2(dy, dx);
-    const orientation = Math.abs(angle) < Math.PI / 4 || Math.abs(angle) > (3 * Math.PI) / 4 ? 'horizontal' : 'vertical';
     
-    // For horizontal walls, use the minimum Y
-    const y = Math.min(wall.start.y, wall.end.y);
-    // For vertical walls, use the minimum X
-    const x = Math.min(wall.start.x, wall.end.x);
-    // Get wall length
-    const length = getWallLength(wall);
-    const lengthInFeet = (length / PIXELS_PER_FOOT).toFixed(2);
-
-    console.log(`\nWall ${index + 1}:`, { 
-      orientation, 
-      length: lengthInFeet + "'", 
-      position: { x, y },
-      angle: (angle * 180 / Math.PI).toFixed(1) + '°',
-      start: wall.start,
-      end: wall.end
-    });
-
     // Check if this is a horizontal wall (nearly 0° or 180°)
     const isHorizontal = Math.abs(Math.abs(angle) - Math.PI) < Math.PI / 4 || Math.abs(angle) < Math.PI / 4;
     // Check if this is a vertical wall (nearly 90° or 270°)
     const isVertical = Math.abs(Math.abs(angle) - Math.PI/2) < Math.PI / 4;
 
-    console.log(`Wall ${index + 1} analysis:`, {
-      isHorizontal,
-      isVertical,
-      angle: (angle * 180 / Math.PI).toFixed(1) + '°'
-    });
+    // For horizontal walls, use the minimum Y
+    const y = Math.min(wall.start.y, wall.end.y);
+    // For vertical walls, use the minimum X
+    const x = Math.min(wall.start.x, wall.end.x);
 
     if (isHorizontal) {
-      if (y < minY || (y === minY && x < (topWall?.start.x ?? Infinity))) {
-        console.log('-> Selected as top wall (Y:', y, ')');
+      if (y < minY) {
         topWall = wall;
         minY = y;
       }
     } else if (isVertical) {
-      if (x < minX || (x === minX && y < (leftWall?.start.y ?? Infinity))) {
-        console.log('-> Selected as left wall (X:', x, ')');
+      if (x < minX) {
         leftWall = wall;
         minX = x;
       }
     }
   });
 
-  // Draw measurements for top and left walls only
+  // Draw measurements for top and left walls
   if (topWall) {
     const length = getWallLength(topWall);
     const lengthInFeet = (length / PIXELS_PER_FOOT).toFixed(2);
-    drawTopWallMeasurement(ctx, topWall, lengthInFeet);
+    drawDimensionLine(
+      ctx,
+      topWall.start,
+      topWall.end,
+      40, // Increased offset for better visibility
+      `${lengthInFeet}'`
+    );
   }
 
   if (leftWall) {
     const length = getWallLength(leftWall);
     const lengthInFeet = (length / PIXELS_PER_FOOT).toFixed(2);
-    drawLeftWallMeasurement(ctx, leftWall, lengthInFeet);
+    drawDimensionLine(
+      ctx,
+      leftWall.start,
+      leftWall.end,
+      40, // Increased offset for better visibility
+      `${lengthInFeet}'`
+    );
   }
-}
-
-function drawTopWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, lengthInFeet: string) {
-  console.log('Drawing top wall measurement:', { start: wall.start, end: wall.end, length: lengthInFeet });
-  
-  const midX = (wall.start.x + wall.end.x) / 2;
-  const y = Math.min(wall.start.y, wall.end.y) - 25;
-
-  ctx.save();
-  ctx.font = '14px Arial';
-  ctx.fillStyle = '#000';
-  ctx.textAlign = 'center';
-  ctx.fillText(`${lengthInFeet}'`, midX, y);
-  ctx.restore();
-}
-
-function drawLeftWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, lengthInFeet: string) {
-  console.log('Drawing left wall measurement:', { start: wall.start, end: wall.end, length: lengthInFeet });
-  
-  const x = Math.min(wall.start.x, wall.end.x) - 25;
-  const midY = (wall.start.y + wall.end.y) / 2;
-
-  ctx.save();
-  ctx.font = '14px Arial';
-  ctx.fillStyle = '#000';
-  ctx.textAlign = 'right';
-  ctx.translate(x, midY);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText(`${lengthInFeet}'`, 0, 0);
-  ctx.restore();
 }
 
 // Helper function to get the combined wall length and endpoints
@@ -738,14 +905,23 @@ export function drawInProgressWall(
     const start = wall.start;
     const end = wall.end;
     const cp = wall.controlPoints[0];
-    
+
     const midX = (start.x + end.x) / 2;
     const midY = (start.y + end.y) / 2;
     const dx = end.x - start.x;
     const dy = end.y - start.y;
     
-    const cpX = midX + cp.x * dy;
-    const cpY = midY - cp.y * dx;
+    // Calculate normalized normal vector for better curve control
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const normalX = -dy / dist;
+    const normalY = dx / dist;
+
+    // Calculate control point distance along normal vector
+    const cpDist = (cp.x - start.x) * normalX + (cp.y - start.y) * normalY;
+
+    // Calculate final control point position
+    const cpX = midX + normalX * cpDist;
+    const cpY = midY + normalY * cpDist;
     
     ctx.quadraticCurveTo(cpX, cpY, end.x, end.y);
   } else {
@@ -814,5 +990,100 @@ export function drawRoomPreview(
     drawLeftWallMeasurement(ctx, leftWall, (height / PIXELS_PER_FOOT).toFixed(2));
   }
   
+  ctx.restore();
+}
+
+// Add function to draw selection point
+export function drawSelectionPoint(
+  ctx: CanvasRenderingContext2D,
+  point: Point2D
+) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+  ctx.fillStyle = '#1976d2';
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Enhance wall drawing to show curve controls
+export function drawWallWithControls(
+  ctx: CanvasRenderingContext2D,
+  wall: WallData,
+  isSelected: boolean
+) {
+  // Existing wall drawing code...
+  
+  if (isSelected && wall.controlPoints?.length) {
+    wall.controlPoints.forEach(point => {
+      drawControlPoint(ctx, point);
+    });
+  }
+}
+
+// Function to draw control points for curved walls
+function drawControlPoint(ctx: CanvasRenderingContext2D, point: Point2D) {
+  const radius = 5;
+  ctx.beginPath();
+  ctx.arc(point.x, point.y, radius, 0, 2 * Math.PI);
+  ctx.fillStyle = '#4CAF50';
+  ctx.fill();
+  ctx.strokeStyle = '#2E7D32';
+  ctx.stroke();
+}
+
+function drawTopWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, measurement: string) {
+  const midX = (wall.start.x + wall.end.x) / 2;
+  const midY = (wall.start.y + wall.end.y) / 2;
+  
+  ctx.save();
+  ctx.translate(midX, midY);
+  ctx.rotate(0);
+  
+  ctx.font = 'bold 14px Arial';
+  const textMetrics = ctx.measureText(measurement);
+  const padding = 4;
+  
+  ctx.fillStyle = 'white';
+  ctx.fillRect(
+    -textMetrics.width/2 - padding,
+    -20 - padding,
+    textMetrics.width + padding * 2,
+    20 + padding
+  );
+  
+  ctx.fillStyle = '#2196F3';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(measurement, 0, -5);
+  ctx.restore();
+}
+
+function drawLeftWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, measurement: string) {
+  const midX = (wall.start.x + wall.end.x) / 2;
+  const midY = (wall.start.y + wall.end.y) / 2;
+  
+  ctx.save();
+  ctx.translate(midX, midY);
+  ctx.rotate(-Math.PI / 2);
+  
+  ctx.font = 'bold 14px Arial';
+  const textMetrics = ctx.measureText(measurement);
+  const padding = 4;
+  
+  ctx.fillStyle = 'white';
+  ctx.fillRect(
+    -textMetrics.width/2 - padding,
+    -20 - padding,
+    textMetrics.width + padding * 2,
+    20 + padding
+  );
+  
+  ctx.fillStyle = '#2196F3';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(measurement, 0, -5);
   ctx.restore();
 }
