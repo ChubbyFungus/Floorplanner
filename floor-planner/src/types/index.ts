@@ -1,4 +1,3 @@
-
 export interface Point2D {
     x: number;
     y: number;
@@ -16,6 +15,7 @@ export interface Point2D {
     thickness: number;
     height: number;
     materialId?: string;
+    type?: 'straight' | 'curved';
   }
   
   /**
@@ -70,4 +70,3 @@ export interface Point2D {
     updatedAt: string;
     createdAt: string;
   }
-  

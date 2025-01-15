@@ -13,7 +13,7 @@ import {
 import { setDimensions } from "../store/slices/floorPlannerSlice";
 import { calculateAreaAndVolume } from "../utils/geometryUtils";
 import { Box, Container, Typography, Button, Alert, Slider } from "@mui/material";
-import { FloorPlanner2D } from "../components/floorplanner/FloorPlanner2D";
+import FloorPlanner2D from "../components/floorplanner/FloorPlanner2D";
 import { FloorPlanner3D } from "../components/floorplanner/FloorPlanner3D";
 
 export const FloorPlanner: React.FC = () => {

@@ -1,35 +1,25 @@
 // src/components/floorplanner/FloorPlanner2D.tsx
 
-import React, { useRef, useEffect, useState, useCallback } from "react";
-import { useSelector, useDispatch } from "react-redux";
-import { RootState, AppDispatch } from "../../store";
-import { Point2D } from "../../types";
+import React, { useRef, useEffect, useCallback, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { v4 as uuidv4 } from 'uuid';
+import { AppDispatch, RootState } from '../../store/store';
+import { Point2D, WallData } from '../../types/types';
+import { getDistance, wouldCompleteShape } from '../../utils/geometryUtils';
+import { PIXELS_PER_FOOT, POINT_TOLERANCE } from '../../constants';
 import {
   startWall,
+  addWall,
   updateWallEnd,
+  finalizeWall,
+  cancelWall,
   addWallControlPoint,
   updateLastControlPoint,
-  addWall,
-  clearCanvas,
-  cancelWall,
-  finalizeWall
-} from "../../store/slices/floorPlannerSlice";
-import { createRectangularRoom } from "../../store/slices/roomToolSlice";
-import { v4 as uuidv4 } from "uuid";
-import { drawWalls, drawInProgressWall, drawWallSegmentMeasurements, drawRoomPreview } from "./drawing";
-import { 
-  wouldCompleteShape, 
-  isConnectedToExistingWall, 
-  arePointsEqual, 
-  getDistance, 
-  findNearestWallPoint, 
-  PIXELS_PER_FOOT, 
-  getDistanceToLineSegment 
-} from "../../utils/geometryUtils";
+} from '../../store/slices/floorPlannerSlice';
+import { createRectangularRoom } from '../../store/slices/roomToolSlice';
+import { drawWalls, drawInProgressWall, drawRoomPreview } from './drawing';
 
-const POINT_TOLERANCE = 10;
-
-export const FloorPlanner2D: React.FC = () => {
+const FloorPlanner2D: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dispatch = useDispatch<AppDispatch>();
   const wallInProgress = useSelector((state: RootState) => state.floorPlanner.wallInProgress);
@@ -42,6 +32,8 @@ export const FloorPlanner2D: React.FC = () => {
   const [isAltPressed, setIsAltPressed] = useState(false);
   const [roomStart, setRoomStart] = useState<Point2D | null>(null);
   const [mousePos, setMousePos] = useState<Point2D>({ x: 0, y: 0 });
+  const [selectedPoint, setSelectedPoint] = useState<Point2D | null>(null);
+  const [selectedWall, setSelectedWall] = useState<WallData | null>(null);
 
   // Drawing functions
   const redraw = useCallback(() => {
@@ -49,13 +41,24 @@ export const FloorPlanner2D: React.FC = () => {
     const ctx = canvas?.getContext('2d');
     if (!ctx || !canvas) return;
 
+    console.log("Redrawing with measurements:", showMeasurements);
+
     // Get DPI scale
     const dpr = window.devicePixelRatio || 1;
-    ctx.save();
-    ctx.scale(1/dpr, 1/dpr);  // Unscale for drawing
-
+    
+    // Set canvas size in device pixels
+    const displayWidth = canvas.clientWidth;
+    const displayHeight = canvas.clientHeight;
+    
+    // Set actual size in memory (scaled for DPI)
+    canvas.width = displayWidth * dpr;
+    canvas.height = displayHeight * dpr;
+    
+    // Scale context for correct drawing
+    ctx.scale(dpr, dpr);
+    
     // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, displayWidth, displayHeight);
 
     // Draw existing walls with measurements (if enabled)
     drawWalls(ctx, walls, showMeasurements);
@@ -69,8 +72,6 @@ export const FloorPlanner2D: React.FC = () => {
     if (selectedTool === 'room' && roomStart && mousePos) {
       drawRoomPreview(ctx, roomStart, mousePos, showMeasurements);
     }
-
-    ctx.restore();
   }, [walls, wallInProgress, showMeasurements, selectedTool, roomStart, mousePos]);
 
   // Canvas setup effect
@@ -83,20 +84,22 @@ export const FloorPlanner2D: React.FC = () => {
       if (!parent) return;
 
       const rect = parent.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
       
       // Set display size (css pixels)
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
-
-      // Set actual size in memory (no DPR scaling)
-      canvas.width = rect.width;
-      canvas.height = rect.height;
+      
+      // Set actual size in memory (scaled for DPI)
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
 
       redraw();
     };
 
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
+
     return () => window.removeEventListener('resize', resizeCanvas);
   }, [redraw]);
 
@@ -350,20 +353,14 @@ export const FloorPlanner2D: React.FC = () => {
 
   return (
     <div className="relative w-full h-full">
-      <div className="absolute top-4 right-4 z-10 flex gap-2">
-        <button
-          className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-          onClick={() => dispatch(clearCanvas())}
-        >
-          Clear Canvas
-        </button>
-      </div>
       <canvas
         ref={canvasRef}
-        className="w-full h-full bg-white"
-        onClick={handleCanvasClick}
+        className="w-full h-full"
         onMouseMove={handleMouseMove}
+        onClick={handleCanvasClick}
       />
     </div>
   );
 };
+
+export default FloorPlanner2D;
