@@ -61,7 +61,15 @@ function drawWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, offs
 
 // Debug logging
 function logWallInfo(prefix: string, wall: WallData) {
-  console.log(`${prefix} - id: ${wall.id}, start: (${wall.start.x}, ${wall.start.y}), end: (${wall.end.x}, ${wall.end.y})`);
+  console.log(`${prefix} Wall:`, {
+    id: wall.id,
+    type: wall.type,
+    start: wall.start,
+    end: wall.end,
+    controlPoints: wall.controlPoints,
+    thickness: wall.thickness,
+    height: wall.height
+  });
 }
 
 // Helper function to determine measurement side for a wall
@@ -527,6 +535,7 @@ export function drawWalls(
 
   // Draw all walls first
   walls.forEach((wall, index) => {
+    logWallInfo(`Drawing`, wall);
     ctx.save();
     ctx.strokeStyle = "#333";
     ctx.lineWidth = wall.thickness * scale;
@@ -856,6 +865,7 @@ function getAngleBetweenWalls(wall1: WallData, wall2: WallData): number {
 
 export function drawWallSegmentMeasurements(ctx: CanvasRenderingContext2D, walls: WallData[]) {
   walls.forEach(wall => {
+    logWallInfo('Processing', wall);
     // Find all intersection points on this wall
     const intersections = findWallIntersections(wall, walls);
     if (intersections.length > 0) {
@@ -876,6 +886,7 @@ export function drawWallSegmentMeasurements(ctx: CanvasRenderingContext2D, walls
         // Create a temporary wall object for each segment
         const segmentWall: WallData = {
           id: wall.id + '_segment_' + i,
+          type: 'straight',
           start: points[i],
           end: points[i + 1],
           thickness: wall.thickness,
@@ -976,6 +987,7 @@ export function drawRoomPreview(
     // Create temporary wall objects for measurements
     const topWall: WallData = {
       id: 'preview_top',
+      type: 'straight', // Add wall type
       start: { x: Math.min(start.x, end.x), y: Math.min(start.y, end.y) },
       end: { x: Math.max(start.x, end.x), y: Math.min(start.y, end.y) },
       thickness: 10,
@@ -985,6 +997,7 @@ export function drawRoomPreview(
     
     const leftWall: WallData = {
       id: 'preview_left',
+      type: 'straight', // Add wall type
       start: { x: Math.min(start.x, end.x), y: Math.min(start.y, end.y) },
       end: { x: Math.min(start.x, end.x), y: Math.max(start.y, end.y) },
       thickness: 10,

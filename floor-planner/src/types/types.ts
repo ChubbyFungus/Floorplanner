@@ -3,14 +3,25 @@ export interface Point2D {
   y: number;
 }
 
-export interface WallData {
+export interface BaseWallData {
   id: string;
+  type: 'straight' | 'curved';
   start: Point2D;
   end: Point2D;
   controlPoints?: Point2D[];
   thickness: number;
   height: number;
 }
+
+export interface StraightWallData extends BaseWallData {
+  type: 'straight';
+}
+
+export interface CurvedWallData extends BaseWallData {
+  type: 'curved';
+}
+
+export type WallData = StraightWallData | CurvedWallData;
 
 export interface RoomData {
   id: string;
