@@ -33,12 +33,52 @@ export const FloorPlanner: React.FC = () => {
   const { walls, fixtures, dimensions } = floorPlanner;
 
   const [localAngleSnap, setLocalAngleSnap] = useState(angleSnapIncrement);
+  const [isCalculating, setIsCalculating] = useState(false);
 
   // Recalculate area/volume whenever walls or fixtures change
   useEffect(() => {
-    const { totalArea, totalVolume } = calculateAreaAndVolume(walls, fixtures);
-    dispatch(setDimensions({ totalArea, totalVolume }));
-  }, [walls, fixtures, dispatch]);
+    console.log('Dimensions effect triggered', {
+      wallsLength: walls.length,
+      fixturesLength: fixtures.length,
+      isCalculating
+    });
+
+    if (isCalculating) {
+      console.log('Skipping calculation as one is in progress');
+      return;
+    }
+
+    // Debounce the calculation to prevent rapid updates
+    const timer = setTimeout(() => {
+      setIsCalculating(true);
+      console.log('Starting dimension calculation');
+
+      try {
+        if (walls.length === 0) {
+          console.log('No walls, resetting dimensions');
+          dispatch(setDimensions({ totalArea: 0, totalVolume: 0 }));
+        } else {
+          const { totalArea, totalVolume } = calculateAreaAndVolume(walls, fixtures);
+          console.log('New dimensions calculated:', { totalArea, totalVolume });
+          
+          // Only update if values have changed significantly
+          if (Math.abs(dimensions.totalArea - totalArea) > 0.001 || 
+              Math.abs(dimensions.totalVolume - totalVolume) > 0.001) {
+            console.log('Dimensions changed, updating state');
+            dispatch(setDimensions({ totalArea, totalVolume }));
+          } else {
+            console.log('Dimensions unchanged, skipping update');
+          }
+        }
+      } catch (error) {
+        console.error('Error calculating dimensions:', error);
+      } finally {
+        setIsCalculating(false);
+      }
+    }, 100); // 100ms debounce
+
+    return () => clearTimeout(timer);
+  }, [walls, fixtures]); // Remove dimensions and dispatch from dependencies
 
   const handleToggleGrid = () => {
     dispatch(toggleGrid());

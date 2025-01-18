@@ -490,10 +490,12 @@ export function isRoomBoundaryWall(wall: WallData, walls: WallData[]): boolean {
     
   // A wall is a boundary if it has connecting walls at both ends
   const hasStartConnection = connectedWalls.some(w => 
-    arePointsEqual(w.start, wall.start) || arePointsEqual(w.end, wall.start)
+    arePointsEqual(w.start, wall.start) || 
+    arePointsEqual(w.end, wall.start)
   );
   const hasEndConnection = connectedWalls.some(w => 
-    arePointsEqual(w.start, wall.end) || arePointsEqual(w.end, wall.end)
+    arePointsEqual(w.start, wall.end) || 
+    arePointsEqual(w.end, wall.end)
   );
   
   return hasStartConnection && hasEndConnection;
@@ -677,5 +679,90 @@ export const createCurvedWall = (
     ...wall,
     controlPoints: [controlPoint],
     type: 'curved'
+  };
+};
+
+// Add grid snapping utilities
+export const snapToGrid = (point: Point2D, gridSize: number): Point2D => {
+  return {
+    x: Math.round(point.x / gridSize) * gridSize,
+    y: Math.round(point.y / gridSize) * gridSize
+  };
+};
+
+export const snapPointToNearestGridIntersection = (
+  point: Point2D,
+  gridSize: number,
+  tolerance: number
+): Point2D => {
+  const nearestGridPoint = snapToGrid(point, gridSize);
+  const distance = getDistance(point, nearestGridPoint);
+  
+  return distance <= tolerance ? nearestGridPoint : point;
+};
+
+// Add wall snapping utilities
+export const snapPointToNearestWall = (
+  point: Point2D,
+  walls: WallData[],
+  tolerance: number
+): Point2D | null => {
+  let closestPoint: Point2D | null = null;
+  let minDistance = tolerance;
+
+  walls.forEach(wall => {
+    const points = [wall.start, ...(wall.controlPoints || []), wall.end];
+    
+    // Check wall endpoints
+    points.forEach(wallPoint => {
+      const distance = getDistance(point, wallPoint);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestPoint = wallPoint;
+      }
+    });
+
+    // Check wall segments
+    for (let i = 0; i < points.length - 1; i++) {
+      const start = points[i];
+      const end = points[i + 1];
+      const projectedPoint = projectPointOnLine(point, start, end);
+      
+      if (projectedPoint) {
+        const distance = getDistance(point, projectedPoint);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestPoint = projectedPoint;
+        }
+      }
+    }
+  });
+
+  return closestPoint;
+};
+
+// Helper function to project a point onto a line segment
+export const projectPointOnLine = (
+  point: Point2D,
+  lineStart: Point2D,
+  lineEnd: Point2D
+): Point2D | null => {
+  const dx = lineEnd.x - lineStart.x;
+  const dy = lineEnd.y - lineStart.y;
+  const lengthSquared = dx * dx + dy * dy;
+
+  if (lengthSquared === 0) return null;
+
+  const t = (
+    ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) /
+    lengthSquared
+  );
+
+  if (t < 0) return lineStart;
+  if (t > 1) return lineEnd;
+
+  return {
+    x: lineStart.x + t * dx,
+    y: lineStart.y + t * dy
   };
 };

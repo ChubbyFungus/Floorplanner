@@ -1,0 +1,82 @@
+# Keeping the Codebase Simple and Maintainable
+
+Below are **best practices** for ensuring your Floorplanner integration remains clean, efficient, and easy to extend. By focusing on core design functionality and clear coding standards, you’ll avoid unnecessary complexity while maintaining a smooth user experience.
+
+---
+
+## Table of Contents
+1. [Modular Architecture](#modular-architecture)
+2. [Clear Data Structures](#clear-data-structures)
+3. [Minimal Business Logic](#minimal-business-logic)
+4. [Lean & Reusable Components](#lean--reusable-components)
+5. [Straightforward Error Handling](#straightforward-error-handling)
+6. [Comprehensive Testing](#comprehensive-testing)
+7. [Optional AI Design Tips](#optional-ai-design-tips)
+8. [Document as You Go](#document-as-you-go)
+9. [Summary](#summary)
+
+---
+
+## Modular Architecture
+- **Separate Concerns**: Keep your design logic in one module or folder, and avoid mixing it with unrelated features.  
+- **APIs or Interfaces**: If you need to share data with other tools, create a clear, minimal interface for importing or exporting structured data.
+
+---
+
+## Clear Data Structures
+- **Well-Defined Schema**: Decide on a consistent format to store designs (e.g., JSON), including dimensions, fixtures, finishes, etc.  
+- **Simple Field Names**: Use short, intuitive keys (e.g., `fixtures`, `brand`, `model`) to reduce confusion.  
+- **Flexible Extension**: Plan for future fields (e.g., `lighting`), but keep nesting minimal.
+
+---
+
+## Minimal Business Logic
+- **Design-Only Focus**: Let your code handle layout, fixture placement, and materials without additional overhead.  
+- **Capture Choices**: Record user selections (e.g., brand, color) in your data model.  
+
+---
+
+## Lean & Reusable Components
+- **Generic UI Elements**: Build small, reusable components (e.g., for drawing walls, rotating items) instead of monolithic classes.  
+- **Lightweight Dependencies**: Only import the libraries you truly need. Avoid large, untested plugins.  
+- **Configurable**: Use environment variables or config files to handle toggles and endpoints, reducing hard-coding.
+
+---
+
+## Straightforward Error Handling
+- **Meaningful Messages**: Provide clear, direct error messages (e.g., “Invalid dimension input”).  
+- **Graceful Fallbacks**: If a fixture library fails, default to placeholder items instead of breaking the whole app.  
+- **Client-Side Validation**: Check user inputs (dimensions, item selections) locally for immediate feedback.
+
+---
+
+## Comprehensive Testing
+1. **Unit Tests**: Validate core functions (e.g., how walls are drawn, how objects snap).  
+2. **Integration Tests**: Ensure modules communicate properly (e.g., a fixture library updates the main layout).  
+3. **UI/UX Tests**: Use tools like Cypress or Selenium to confirm interactions (drag-and-drop, wizard steps).  
+4. **Regression Tests**: Re-run tests after changes to confirm nothing else broke.
+
+---
+
+## Optional AI Design Tips
+- **Decouple AI**: Keep AI logic in a separate module that can parse your layout data and return suggestions.  
+- **Simple Request/Response**: Send your structured data to an AI endpoint and receive improvement ideas (e.g., “Add more clearance around the island”).  
+- **Contextual Display**: Show tips in a sidebar or pop-up for easy reference.  
+- **Non-Blocking**: Don’t freeze the UI; let users keep designing while AI processes in the background.
+
+---
+
+## Document as You Go
+- **In-Line Comments**: Explain complex or non-obvious code.  
+- **README Files**: Each folder or module has a brief overview.  
+- **API Contracts**: If you share data externally, outline the format and required fields.
+
+---
+
+## Summary
+- **Modular & Clear**: Maintain a well-organized codebase focused on design features.  
+- **Minimal & Tested**: Avoid clutter, rely on short, reusable components, and test thoroughly.  
+- **Well-Documented**: Keep consistent docs for internal clarity and future extension.  
+- **Optional AI**: Enhance user experience with design tips in a separate, non-intrusive AI module.
+
+By following these guidelines, your Floorplanner integration remains **robust**, **flexible**, and **easy to adapt**—even as your project or feature set grows.

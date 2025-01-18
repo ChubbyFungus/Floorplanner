@@ -1,27 +1,29 @@
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export interface UiState {
   showGrid: boolean;
   snapToGrid: boolean;
   angleSnapEnabled: boolean;
   angleSnapIncrement: number;
-  selectedTool: string | null;
+  selectedTool: 'wall' | 'room' | 'select' | null;
   showMeasurements: boolean;
   errorMessage: string | null;
+  gridSize: number;
 }
 
 const initialState: UiState = {
   showGrid: true,
   snapToGrid: true,
   angleSnapEnabled: true,
-  angleSnapIncrement: 15,
-  selectedTool: 'wall',
+  angleSnapIncrement: 45,
+  selectedTool: null,
   showMeasurements: true,
-  errorMessage: null
+  errorMessage: null,
+  gridSize: 20
 };
 
 export const uiSlice = createSlice({
-  name: "ui",
+  name: 'ui',
   initialState,
   reducers: {
     toggleGrid: (state) => {
@@ -33,18 +35,20 @@ export const uiSlice = createSlice({
     toggleAngleSnap: (state) => {
       state.angleSnapEnabled = !state.angleSnapEnabled;
     },
-    toggleMeasurements: (state) => {
-      state.showMeasurements = !state.showMeasurements;
-    },
     setAngleSnapIncrement: (state, action: PayloadAction<number>) => {
       state.angleSnapIncrement = action.payload;
     },
-    setSelectedTool: (state, action: PayloadAction<string | null>) => {
-      console.log('Setting selected tool:', action.payload);
+    setSelectedTool: (state, action: PayloadAction<'wall' | 'room' | 'select' | null>) => {
       state.selectedTool = action.payload;
+    },
+    toggleMeasurements: (state) => {
+      state.showMeasurements = !state.showMeasurements;
     },
     setErrorMessage: (state, action: PayloadAction<string | null>) => {
       state.errorMessage = action.payload;
+    },
+    setGridSize: (state, action: PayloadAction<number>) => {
+      state.gridSize = action.payload;
     }
   }
 });
@@ -53,10 +57,11 @@ export const {
   toggleGrid,
   toggleSnapToGrid,
   toggleAngleSnap,
-  toggleMeasurements,
   setAngleSnapIncrement,
   setSelectedTool,
-  setErrorMessage
+  toggleMeasurements,
+  setErrorMessage,
+  setGridSize
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

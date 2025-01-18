@@ -17,42 +17,48 @@ export const createRectangularRoom = createAsyncThunk<void, CreateRoomPayload, {
   "roomTool/createRectangularRoom",
   async (payload, { dispatch }) => {
     const { startX, startY, width, depth, thickness, height } = payload;
+    console.log('Creating rectangular room:', payload);
 
-    // 1) top edge
-    dispatch(addWall({
-      id: crypto.randomUUID(),
-      start: { x: startX, y: startY },
-      end: { x: startX + width, y: startY },
-      thickness,
-      height
-    }));
+    // Create all walls in a batch to prevent tool state interference
+    const walls = [
+      // 1) top edge
+      {
+        id: crypto.randomUUID(),
+        start: { x: startX, y: startY },
+        end: { x: startX + width, y: startY },
+        thickness,
+        height
+      },
+      // 2) right edge
+      {
+        id: crypto.randomUUID(),
+        start: { x: startX + width, y: startY },
+        end: { x: startX + width, y: startY + depth },
+        thickness,
+        height
+      },
+      // 3) bottom edge
+      {
+        id: crypto.randomUUID(),
+        start: { x: startX + width, y: startY + depth },
+        end: { x: startX, y: startY + depth },
+        thickness,
+        height
+      },
+      // 4) left edge
+      {
+        id: crypto.randomUUID(),
+        start: { x: startX, y: startY + depth },
+        end: { x: startX, y: startY },
+        thickness,
+        height
+      }
+    ];
 
-    // 2) right edge
-    dispatch(addWall({
-      id: crypto.randomUUID(),
-      start: { x: startX + width, y: startY },
-      end: { x: startX + width, y: startY + depth },
-      thickness,
-      height
-    }));
-
-    // 3) bottom edge
-    dispatch(addWall({
-      id: crypto.randomUUID(),
-      start: { x: startX + width, y: startY + depth },
-      end: { x: startX, y: startY + depth },
-      thickness,
-      height
-    }));
-
-    // 4) left edge
-    dispatch(addWall({
-      id: crypto.randomUUID(),
-      start: { x: startX, y: startY + depth },
-      end: { x: startX, y: startY },
-      thickness,
-      height
-    }));
+    // Add all walls at once
+    for (const wall of walls) {
+      dispatch(addWall(wall));
+    }
   }
 );
 

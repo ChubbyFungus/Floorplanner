@@ -1,0 +1,212 @@
+# Floorplanner
+
+A **comprehensive breakdown** of how to design kitchens and bathrooms using the Floorplanner module. This tool captures layout and material choices in a structured format, automatically (or manually) exporting your data once you finish your design. Below is a detailed overview of the features, including an **AI Design Tips** option to enhance your layouts.
+
+---
+
+## Table of Contents
+1. [Overview](#overview)  
+2. [Quick Start Wizard](#quick-start-wizard)  
+3. [User Interface & Navigation](#user-interface--navigation)  
+4. [Core Features](#core-features)  
+   - [Rooms & Walls](#rooms--walls)  
+   - [Doors & Windows](#doors--windows)  
+   - [Fixtures & Appliances](#fixtures--appliances)  
+   - [Materials & Finishes](#materials--finishes)  
+   - [2D and 3D Views](#2d-and-3d-views)  
+   - [Styleboard](#styleboard)  
+   - [Measurement & Alignment](#measurement--alignment)  
+   - [Multiple Layout Versions](#multiple-layout-versions)  
+5. [AI Design Tips](#ai-design-tips)  
+6. [Exporting Your Data](#exporting-your-data)  
+7. [Tips & Best Practices](#tips--best-practices)  
+8. [Troubleshooting & FAQ](#troubleshooting--faq)
+
+---
+
+## Overview
+**Floorplanner** is a web-based tool that simplifies the process of designing kitchen and bathroom spaces. With it, you can:
+
+- **Draw** walls, rooms, and basic architectural elements.  
+- **Place** fixtures (e.g., sinks, appliances) in a user-friendly, drag-and-drop interface.  
+- **Apply** materials and finishes (flooring, countertops, cabinetry).  
+- **Visualize** the design in 2D and 3D modes.  
+- **Export** your selections automatically once you finalize, or do so manually at any step.
+
+---
+
+## Quick Start Wizard
+When you first launch Floorplanner, a **wizard** streamlines the initial design steps:
+
+1. **Project Type**  
+   - Specify **Kitchen** or **Bathroom**, or choose a blank canvas for a completely custom project.  
+   - Optionally pick a **Template Layout** for instant inspiration (e.g., “Modern Chic Kitchen,” “Spa-Style Bathroom”).
+
+2. **Room Dimensions**  
+   - Enter approximate **length** and **width**.  
+   - Set **ceiling height** if applicable.
+
+3. **Layout Style & Materials**  
+   - Pick a general **layout style** (L-shape, open concept, etc.).  
+   - Select a **material theme** (e.g., neutral palette, warm wood tones).  
+
+4. **Finish Setup**  
+   - Click **Finish** to generate a starting layout with recommended walls, placeholder fixtures, and default materials.  
+   - The wizard saves these choices into your project data.
+
+**Tip:** You can skip the wizard if you prefer building from scratch.
+
+---
+
+## User Interface & Navigation
+Once through the wizard, you’ll see:
+
+- **Toolbar / Sidebar**: Contains the main drawing and editing tools.  
+- **2D Canvas**: Top-down view for precise arrangement of walls and fixtures.  
+- **3D Toggle**: Switch to a 3D perspective at any time.  
+- **Zoom & Pan**: Use your mouse wheel (or trackpad pinch) to zoom, and left-click/drag to pan around.
+
+**Keyboard Shortcuts:**
+- **D**: Draw walls or rooms  
+- **R**: Rotate an object  
+- **Esc**: Deselect or cancel an action  
+- **Ctrl + Z** (or Cmd + Z on Mac): Undo
+
+---
+
+## Core Features
+
+### Rooms & Walls
+1. **Draw Walls**  
+   - Click **Draw Walls**.  
+   - **Click** on the canvas to start a wall; **drag** to set length; **click** again to confirm.  
+   - Adjust wall **thickness** and **height** in the properties panel.
+
+2. **Draw Rooms**  
+   - Automatically create rectangular rooms with user-defined dimensions.  
+   - **Rename** rooms (e.g., “Master Bath,” “Island Kitchen”) to keep projects organized.
+
+### Doors & Windows
+1. **Insert Door/Window**  
+   - Drag your choice of door or window from the **Doors & Windows** library onto any wall.  
+   - Items snap in place for straightforward alignment.
+
+2. **Size & Style**  
+   - Click the placed door/window to adjust **width, height, swing direction**, or **frame style**.
+
+### Fixtures & Appliances
+1. **Select from Library**  
+   - Choose from a range of items (sinks, ovens, refrigerators, tubs, toilets) in the **Fixture Library**.  
+   - Place them with a simple **drag-and-drop**.
+
+2. **Properties**  
+   - Click an item to change dimensions or orientation.  
+   - Rename or label objects (e.g., “Farmhouse Sink,” “French Door Fridge”) for clarity.
+
+### Materials & Finishes
+1. **Material Palette**  
+   - Browse tile, wood, stone, and paint finishes.  
+   - Drag onto floors, walls, countertops, or cabinets to apply.
+
+2. **Detail Options**  
+   - Adjust **grout** or **edge** details for added realism.  
+   - No numeric cost references—just visual finishes.
+
+### 2D and 3D Views
+1. **2D View**  
+   - A top-down view ideal for measuring precise layouts.  
+   - Easiest for dragging, resizing, and aligning elements.
+
+2. **3D View**  
+   - Click **3D Toggle** to see your space from any angle.  
+   - **Orbit** around or enter a **Walkthrough** mode for a more immersive check.
+
+### Styleboard
+1. **Collect Items & Finishes**  
+   - Pin your chosen colors, materials, and fixture images to a **Styleboard** area.  
+   - Keeps a visual record of your overall design concept.
+
+2. **Notes & Comparisons**  
+   - Add short **notes** (e.g., “Preferred marble slab,” “Brushed nickel fixtures”).  
+   - Tag different concepts as “Option A” vs. “Option B.”
+
+### Measurement & Alignment
+1. **Tape Measure**  
+   - Click two points to see the exact distance.  
+   - Verify walkway clearance or counter height quickly.
+
+2. **Snap Guides**  
+   - Edges auto-snap to each other for precise alignment.  
+   - Guidelines appear when objects are flush or centered.
+
+### Multiple Layout Versions
+1. **Duplicate Layout**  
+   - Make copies of your current design to explore variations without losing progress.  
+   - Example: Try “Layout 1 – Traditional” vs. “Layout 2 – Contemporary.”
+
+2. **Compare**  
+   - Switch between versions to see how different layouts feel.  
+   - Export each version separately if you want to keep them on record.
+
+---
+
+## AI Design Tips
+To enhance creativity and efficiency, Floorplanner includes an **AI Design Tips** feature:
+
+1. **How It Works**  
+   - Your current layout data is analyzed by the AI module.  
+   - In real time, it may suggest improvements (e.g., “Add more clearance around the island” or “Consider using lighter finishes to maximize the sense of space”).
+
+2. **Requesting Suggestions**  
+   - Click **“Get AI Tips”** or open the AI sidebar.  
+   - The system reviews your layout (rooms, fixtures, materials) and generates advice.
+
+3. **Applying Tips**  
+   - Tips appear in a panel with brief descriptions.  
+   - You can manually apply them (e.g., reposition a wall) or ignore if it doesn’t fit your vision.
+
+4. **Non-Blocking**  
+   - AI analysis runs in the background. You can keep working while tips are generated.  
+   - If the AI service is unavailable, the rest of Floorplanner still functions normally.
+
+---
+
+## Exporting Your Data
+Once you’ve finalized your layout:
+
+1. **Automatic Export**  
+   - Clicking **Finish** (or **Done**) triggers an automatic data export.  
+   - This creates a structured file/object containing all room dimensions, fixture placements, and material selections.
+
+2. **Manual Export**  
+   - At any point, choose **“Save & Export”** to generate a data file or object.  
+   - Perfect for backing up an in-progress design or sharing with collaborators.
+
+3. **Data Structure Example**  
+   ```json
+   {
+     "projectType": "Kitchen",
+     "dimensions": {
+       "length": "15ft",
+       "width": "12ft",
+       "ceilingHeight": "9ft"
+     },
+     "layoutStyle": "L-shape",
+     "fixtures": [
+       {
+         "type": "range",
+         "brand": "Wolf",
+         "dimensions": { "width": "48in", "depth": "30in", "height": "36in" }
+       },
+       {
+         "type": "sink",
+         "brand": "Kohler",
+         "dimensions": { "width": "33in", "depth": "21in", "height": "9in" }
+       }
+     ],
+     "finishes": {
+       "countertops": "Marble",
+       "cabinets": "White Shaker",
+       "flooring": "Herringbone Wood"
+     }
+   }

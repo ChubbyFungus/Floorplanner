@@ -10,6 +10,7 @@ import { PIXELS_PER_FOOT, POINT_TOLERANCE } from '../../constants';
 import {
   startWall,
   addWall,
+  updateWall,
   updateWallEnd,
   finalizeWall,
   cancelWall,
@@ -18,6 +19,8 @@ import {
 } from '../../store/slices/floorPlannerSlice';
 import { createRectangularRoom } from '../../store/slices/roomToolSlice';
 import { drawWalls, drawInProgressWall, drawRoomPreview } from './drawing';
+import WallEditControls from './WallEditControls';
+import Grid from './Grid'; // Assuming Grid component is in the same directory
 
 const FloorPlanner2D: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -34,8 +37,11 @@ const FloorPlanner2D: React.FC = () => {
   const [mousePos, setMousePos] = useState<Point2D>({ x: 0, y: 0 });
   const [selectedPoint, setSelectedPoint] = useState<Point2D | null>(null);
   const [selectedWall, setSelectedWall] = useState<WallData | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<Point2D | null>(null);
+  const [dragOffset, setDragOffset] = useState<Point2D>({ x: 0, y: 0 });
 
-  // Drawing functions
+  // Enhanced redraw function to show selected wall
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
@@ -63,6 +69,32 @@ const FloorPlanner2D: React.FC = () => {
     // Draw existing walls with measurements (if enabled)
     drawWalls(ctx, walls, showMeasurements);
 
+    // Highlight selected wall
+    if (selectedWall) {
+      ctx.save();
+      ctx.strokeStyle = '#2196f3';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(selectedWall.start.x, selectedWall.start.y);
+      if (selectedWall.controlPoints) {
+        selectedWall.controlPoints.forEach(point => {
+          ctx.lineTo(point.x, point.y);
+        });
+      }
+      ctx.lineTo(selectedWall.end.x, selectedWall.end.y);
+      ctx.stroke();
+      
+      // Draw control points
+      const points = [selectedWall.start, ...(selectedWall.controlPoints || []), selectedWall.end];
+      points.forEach(point => {
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 5, 0, 2 * Math.PI);
+        ctx.fillStyle = '#2196f3';
+        ctx.fill();
+      });
+      ctx.restore();
+    }
+
     // Draw wall in progress
     if (wallInProgress) {
       drawInProgressWall(ctx, wallInProgress, showMeasurements);
@@ -72,36 +104,7 @@ const FloorPlanner2D: React.FC = () => {
     if (selectedTool === 'room' && roomStart && mousePos) {
       drawRoomPreview(ctx, roomStart, mousePos, showMeasurements);
     }
-  }, [walls, wallInProgress, showMeasurements, selectedTool, roomStart, mousePos]);
-
-  // Canvas setup effect
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const resizeCanvas = () => {
-      const parent = canvas.parentElement;
-      if (!parent) return;
-
-      const rect = parent.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      
-      // Set display size (css pixels)
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
-      
-      // Set actual size in memory (scaled for DPI)
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-
-      redraw();
-    };
-
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
-    return () => window.removeEventListener('resize', resizeCanvas);
-  }, [redraw]);
+  }, [walls, wallInProgress, showMeasurements, selectedTool, roomStart, mousePos, selectedWall]);
 
   // Helper function to snap angles
   const snapAngle = useCallback((start: Point2D, end: Point2D): Point2D => {
@@ -223,22 +226,51 @@ const FloorPlanner2D: React.FC = () => {
       }
     }
     
+    if (isDragging && selectedWall && dragStart) {
+      const dx = point.x - dragStart.x;
+      const dy = point.y - dragStart.y;
+      
+      // Update wall position
+      const newWall = {
+        ...selectedWall,
+        start: {
+          x: selectedWall.start.x + dx,
+          y: selectedWall.start.y + dy
+        },
+        end: {
+          x: selectedWall.end.x + dx,
+          y: selectedWall.end.y + dy
+        },
+        controlPoints: selectedWall.controlPoints?.map(cp => ({
+          x: cp.x + dx,
+          y: cp.y + dy
+        }))
+      };
+      
+      dispatch(updateWall(newWall));
+      setDragStart(point);
+      return;
+    }
+    
     setMousePos(point);
     redraw();
-  }, [dispatch, wallInProgress, isAltPressed, snapAngle, selectedTool, getMousePosition, redraw, walls]);
+  }, [dispatch, wallInProgress, isAltPressed, snapAngle, selectedTool, getMousePosition, isDragging, selectedWall, dragStart, walls]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current) return;
 
     const point = getMousePosition(e);
-    console.log('Canvas clicked:', { 
-      point, 
-      selectedTool, 
-      wallInProgress, 
-      wallCount: walls.length,
-      walls
-    });
-
+    
+    if (selectedTool === 'select') {
+      const wall = findWallUnderPoint(point);
+      setSelectedWall(wall);
+      if (!wall) {
+        setIsDragging(false);
+        setDragStart(null);
+      }
+      return;
+    }
+    
     if (selectedTool === 'wall') {
       console.log('Wall tool active');
       if (wallInProgress) {
@@ -288,11 +320,13 @@ const FloorPlanner2D: React.FC = () => {
         dispatch(startWall(startPoint));
       }
     } else if (selectedTool === 'room') {
-      console.log(`Selected tool: ${selectedTool} (Room tool)`);
+      console.log('Room tool active:', { roomStart });
       if (!roomStart) {
         // For the first click, try to snap to existing walls
         const nearestPoint = findNearestWallPoint(point, walls);
-        setRoomStart(nearestPoint || point);
+        const startPoint = nearestPoint || point;
+        console.log('Setting room start point:', startPoint);
+        setRoomStart(startPoint);
       } else {
         // For the second click, apply snapping
         const nearestPoint = findNearestWallPoint(point, walls);
@@ -307,6 +341,7 @@ const FloorPlanner2D: React.FC = () => {
         const depthInFeet = depth / PIXELS_PER_FOOT;
         console.log(`Room dimensions: ${widthInFeet.toFixed(2)}' x ${depthInFeet.toFixed(2)}'`);
         
+        // Create room and ensure we stay in room tool mode
         void dispatch(createRectangularRoom({
           startX: Math.min(roomStart.x, endPoint.x),
           startY: Math.min(roomStart.y, endPoint.y),
@@ -314,13 +349,109 @@ const FloorPlanner2D: React.FC = () => {
           depth,
           thickness: 10,
           height: 280
-        }));
-        setRoomStart(null);
+        })).then(() => {
+          console.log('Room creation completed, resetting start point');
+          setRoomStart(null);
+        });
       }
     } else {
       console.log('No tool selected');
     }
-  }, [dispatch, wallInProgress, isAltPressed, snapAngle, selectedTool, roomStart, getMousePosition, walls]);
+  }, [dispatch, wallInProgress, isAltPressed, snapAngle, selectedTool, roomStart, getMousePosition, findWallUnderPoint, walls]);
+
+  const findWallUnderPoint = useCallback((point: Point2D): WallData | null => {
+    for (const wall of walls) {
+      const points = [wall.start, ...(wall.controlPoints || []), wall.end];
+      for (let i = 0; i < points.length - 1; i++) {
+        const start = points[i];
+        const end = points[i + 1];
+        const distance = distanceToLineSegment(point, start, end);
+        if (distance <= POINT_TOLERANCE) {
+          return wall;
+        }
+      }
+    }
+    return null;
+  }, [walls]);
+
+  const distanceToLineSegment = (point: Point2D, start: Point2D, end: Point2D): number => {
+    const A = point.x - start.x;
+    const B = point.y - start.y;
+    const C = end.x - start.x;
+    const D = end.y - start.y;
+
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    let param = -1;
+
+    if (lenSq !== 0) {
+      param = dot / lenSq;
+    }
+
+    let xx, yy;
+
+    if (param < 0) {
+      xx = start.x;
+      yy = start.y;
+    } else if (param > 1) {
+      xx = end.x;
+      yy = end.y;
+    } else {
+      xx = start.x + param * C;
+      yy = start.y + param * D;
+    }
+
+    const dx = point.x - xx;
+    const dy = point.y - yy;
+
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (selectedTool === 'select' && selectedWall) {
+      setIsDragging(true);
+      const point = getMousePosition(e);
+      setDragStart(point);
+      setDragOffset({
+        x: point.x - selectedWall.start.x,
+        y: point.y - selectedWall.start.y
+      });
+    }
+  }, [selectedTool, selectedWall, getMousePosition]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+    setDragStart(null);
+  }, []);
+
+  // Canvas setup effect
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const resizeCanvas = () => {
+      const parent = canvas.parentElement;
+      if (!parent) return;
+
+      const rect = parent.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      
+      // Set display size (css pixels)
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+      
+      // Set actual size in memory (scaled for DPI)
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+
+      redraw();
+    };
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    return () => window.removeEventListener('resize', resizeCanvas);
+  }, [redraw]);
 
   // Redraw whenever relevant state changes
   useEffect(() => {
@@ -352,13 +483,29 @@ const FloorPlanner2D: React.FC = () => {
   }, [dispatch]);
 
   return (
-    <div className="relative w-full h-full">
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <Grid width={canvasRef.current?.width || 0} height={canvasRef.current?.height || 0} />
       <canvas
         ref={canvasRef}
-        className="w-full h-full"
-        onMouseMove={handleMouseMove}
+        style={{
+          width: '100%',
+          height: '100%',
+          cursor: selectedTool === 'select' ? 'pointer' : 'crosshair'
+        }}
         onClick={handleCanvasClick}
+        onMouseMove={handleMouseMove}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onKeyDown={handleKeyDown}
+        onKeyUp={handleKeyUp}
+        tabIndex={0}
       />
+      {selectedWall && (
+        <WallEditControls
+          wall={selectedWall}
+          onClose={() => setSelectedWall(null)}
+        />
+      )}
     </div>
   );
 };
