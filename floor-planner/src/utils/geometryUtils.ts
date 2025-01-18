@@ -9,12 +9,23 @@ export const PIXELS_PER_INCH = PIXELS_PER_FOOT / 12;  // pixels per inch
 export const POINT_TOLERANCE = 30; // Increased for even easier snapping
 export const LINE_SNAP_TOLERANCE = 20; // Tolerance for snapping to wall lines
 
-// Tolerance for considering points as equal (in pixels)
-// const POINT_TOLERANCE = 10; // Increased tolerance to account for DPI scaling
-
 interface CalcResult {
   totalArea: number;
   totalVolume: number;
+}
+
+// Export the area computation function
+export function computeArea(walls: WallData[]): number {
+  if (walls.length === 0) return 0;
+  const points = walls.map(wall => wall.start);
+  return Math.abs(polygonArea(points));
+}
+
+// Export the point inside walls check function
+export function isPointInsideWalls(point: Point2D, walls: WallData[]): boolean {
+  if (walls.length === 0) return false;
+  const points = walls.map(wall => wall.start);
+  return isPointInPolygon(point, points);
 }
 
 export function calculateAreaAndVolume(
@@ -436,6 +447,45 @@ export function getDistanceToLineSegment(point: Point2D, start: Point2D, end: Po
   return { distance, nearestPoint };
 }
 
+export function getDistanceFromPointToLineSegment(point: Point2D, lineStart: Point2D, lineEnd: Point2D): number {
+  const A = point.x - lineStart.x;
+  const B = point.y - lineStart.y;
+  const C = lineEnd.x - lineStart.x;
+  const D = lineEnd.y - lineStart.y;
+
+  const dot = A * C + B * D;
+  const lenSq = C * C + D * D;
+  let param = -1;
+
+  if (lenSq !== 0) {
+    param = dot / lenSq;
+  }
+
+  let xx, yy;
+
+  if (param < 0) {
+    xx = lineStart.x;
+    yy = lineStart.y;
+  } else if (param > 1) {
+    xx = lineEnd.x;
+    yy = lineEnd.y;
+  } else {
+    xx = lineStart.x + param * C;
+    yy = lineStart.y + param * D;
+  }
+
+  const dx = point.x - xx;
+  const dy = point.y - yy;
+
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+// Get distance from point to line
+export function getDistanceFromPointToLine(point: Point2D, start: Point2D, end: Point2D): number {
+  const { distance } = getDistanceToLineSegment(point, start, end);
+  return distance;
+}
+
 // Find nearest point on any wall
 export function findNearestWallPoint(point: Point2D, walls: WallData[]): Point2D | null {
   let nearestPoint: Point2D | null = null;
@@ -702,67 +752,90 @@ export const snapPointToNearestGridIntersection = (
 };
 
 // Add wall snapping utilities
-export const snapPointToNearestWall = (
-  point: Point2D,
-  walls: WallData[],
-  tolerance: number
-): Point2D | null => {
-  let closestPoint: Point2D | null = null;
+export const calculateDistance = (p1: Point2D, p2: Point2D): number => {
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  return Math.sqrt(dx * dx + dy * dy);
+};
+
+export const pointToLineDistance = (point: Point2D, start: Point2D, end: Point2D): number => {
+  const L2 = Math.pow(calculateDistance(start, end), 2);
+  if (L2 === 0) return calculateDistance(point, start);
+  
+  const t = Math.max(0, Math.min(1, (
+    (point.x - start.x) * (end.x - start.x) +
+    (point.y - start.y) * (end.y - start.y)
+  ) / L2));
+  
+  const projection = {
+    x: start.x + t * (end.x - start.x),
+    y: start.y + t * (end.y - start.y)
+  };
+  
+  return calculateDistance(point, projection);
+};
+
+export const findNearestPointOnWall = (point: Point2D, wall: WallData): Point2D => {
+  const L2 = Math.pow(calculateDistance(wall.start, wall.end), 2);
+  if (L2 === 0) return wall.start;
+  
+  const t = Math.max(0, Math.min(1, (
+    (point.x - wall.start.x) * (wall.end.x - wall.start.x) +
+    (point.y - wall.start.y) * (wall.end.y - wall.start.y)
+  ) / L2));
+  
+  return {
+    x: wall.start.x + t * (wall.end.x - wall.start.x),
+    y: wall.start.y + t * (wall.end.y - wall.start.y)
+  };
+};
+
+export const findNearestWallEndpoint = (point: Point2D, walls: WallData[], tolerance: number): Point2D | null => {
+  let nearestPoint = null;
   let minDistance = tolerance;
 
   walls.forEach(wall => {
-    const points = [wall.start, ...(wall.controlPoints || []), wall.end];
-    
-    // Check wall endpoints
-    points.forEach(wallPoint => {
-      const distance = getDistance(point, wallPoint);
+    [wall.start, wall.end].forEach(endpoint => {
+      const distance = calculateDistance(point, endpoint);
       if (distance < minDistance) {
         minDistance = distance;
-        closestPoint = wallPoint;
+        nearestPoint = endpoint;
       }
     });
+  });
 
-    // Check wall segments
-    for (let i = 0; i < points.length - 1; i++) {
-      const start = points[i];
-      const end = points[i + 1];
-      const projectedPoint = projectPointOnLine(point, start, end);
-      
-      if (projectedPoint) {
-        const distance = getDistance(point, projectedPoint);
-        if (distance < minDistance) {
-          minDistance = distance;
-          closestPoint = projectedPoint;
-        }
-      }
+  return nearestPoint;
+};
+
+export const snapPointToNearestWall = (point: Point2D, walls: WallData[], tolerance: number): Point2D | null => {
+  // First check endpoints
+  const nearestEndpoint = findNearestWallEndpoint(point, walls, tolerance);
+  if (nearestEndpoint) return nearestEndpoint;
+
+  // Then check wall lines
+  let nearestPoint = null;
+  let minDistance = tolerance;
+
+  walls.forEach(wall => {
+    const nearestOnWall = findNearestPointOnWall(point, wall);
+    const distance = calculateDistance(point, nearestOnWall);
+    if (distance < minDistance) {
+      minDistance = distance;
+      nearestPoint = nearestOnWall;
     }
   });
 
-  return closestPoint;
+  return nearestPoint;
 };
 
-// Helper function to project a point onto a line segment
-export const projectPointOnLine = (
-  point: Point2D,
-  lineStart: Point2D,
-  lineEnd: Point2D
-): Point2D | null => {
-  const dx = lineEnd.x - lineStart.x;
-  const dy = lineEnd.y - lineStart.y;
-  const lengthSquared = dx * dx + dy * dy;
-
-  if (lengthSquared === 0) return null;
-
-  const t = (
-    ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) /
-    lengthSquared
-  );
-
-  if (t < 0) return lineStart;
-  if (t > 1) return lineEnd;
+export const snapWallEndpoints = (wall: WallData, walls: WallData[], tolerance: number): WallData => {
+  const otherWalls = walls.filter(w => w.id !== wall.id);
+  const snappedStart = snapPointToNearestWall(wall.start, otherWalls, tolerance);
+  const snappedEnd = snapPointToNearestWall(wall.end, otherWalls, tolerance);
 
   return {
-    x: lineStart.x + t * dx,
-    y: lineStart.y + t * dy
+    ...wall,
+    start: snappedStart || wall.start,
+    end: snappedEnd || wall.end
   };
 };

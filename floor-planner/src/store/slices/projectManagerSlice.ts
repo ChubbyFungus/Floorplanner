@@ -1,9 +1,13 @@
-
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { ProjectData } from "../../types";
 
+interface ExtendedProjectData extends ProjectData {
+  version: number;          // for versioning
+  floors?: string[];        // placeholder for multi-floor references
+}
+
 interface ProjectManagerState {
-  projects: ProjectData[];
+  projects: ExtendedProjectData[];
   selectedProjectId: string | null;
   loading: boolean;
 }
@@ -18,14 +22,14 @@ const projectManagerSlice = createSlice({
   name: "projectManager",
   initialState,
   reducers: {
-    setProjects: (state, action: PayloadAction<ProjectData[]>) => {
+    setProjects: (state, action: PayloadAction<ExtendedProjectData[]>) => {
       state.projects = action.payload;
     },
-    addProject: (state, action: PayloadAction<ProjectData>) => {
+    addProject: (state, action: PayloadAction<ExtendedProjectData>) => {
       state.projects.push(action.payload);
     },
     removeProject: (state, action: PayloadAction<string>) => {
-      state.projects = state.projects.filter((p) => p.id !== action.payload);
+      state.projects = state.projects.filter(p => p.id !== action.payload);
     },
     selectProject: (state, action: PayloadAction<string>) => {
       state.selectedProjectId = action.payload;

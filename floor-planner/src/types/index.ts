@@ -1,72 +1,125 @@
 export interface Point2D {
-    x: number;
-    y: number;
-  }
-  
-  /**
-   * WallData
-   * Single wall segment (start -> end) or curved (controlPoints).
-   */
-  export interface WallData {
-    id: string;
-    start: Point2D;
-    end: Point2D;
-    controlPoints?: Point2D[];
-    thickness: number;
-    height: number;
-    materialId?: string;
-    type?: 'straight' | 'curved';
-  }
-  
-  /**
-   * FixtureData
-   * Cabinets, appliances, or any furniture piece.
-   */
-  export interface FixtureData {
-    id: string;
-    name: string;
-    position: Point2D;
-    width: number;
-    depth: number;
-    height: number;
-    rotation?: number;
-    materialId?: string;
-  }
-  
-  /**
-   * MaterialData
-   * Diffuse + normal map, etc.
-   */
-  export interface MaterialData {
-    id: string;
-    name: string;
-    diffuseMap?: string;
-    normalMap?: string;
-    color?: string;
-  }
-  
-  /**
-   * FloorPlannerState
-   */
-  export interface FloorPlannerState {
-    walls: WallData[];
-    fixtures: FixtureData[];
-    materials: MaterialData[];
-    dimensions: {
-      totalArea: number;
-      totalVolume: number;
-    };
-    lastSavedAt: string | null;
-    wallInProgress: WallData | null;
-  }
-  
-  /**
-   * ProjectData
-   */
-  export interface ProjectData {
-    id: string;
-    name: string;
-    description: string;
-    updatedAt: string;
-    createdAt: string;
-  }
+  x: number;
+  y: number;
+}
+
+export interface Point3D extends Point2D {
+  z: number;
+}
+
+export interface Dimensions {
+  width: number;
+  height: number;
+  depth: number;
+}
+
+export interface BaseWallData {
+  id: string;
+  start: Point2D;
+  end: Point2D;
+  height: number;
+  thickness: number;
+  materialId?: string;
+  controlPoints?: Point2D[];
+}
+
+export interface StraightWallData extends BaseWallData {
+  type: 'straight';
+}
+
+export interface CurvedWallData extends BaseWallData {
+  type: 'curved';
+  controlPoint: Point2D;
+}
+
+export interface ArcWallData extends BaseWallData {
+  type: 'arc';
+  radius: number;
+  startAngle: number;
+  endAngle: number;
+  center: Point2D;
+}
+
+export type WallData = StraightWallData | CurvedWallData | ArcWallData;
+
+export interface RoomData {
+  id: string;
+  name: string;
+  points: Point2D[];
+  area: number;
+  perimeter: number;
+  height: number;
+  materialId?: string;
+}
+
+export interface FixtureData {
+  id: string;
+  name: string;
+  type: string;
+  position: Point2D;
+  rotation: number;
+  dimensions: Dimensions;
+  materialId?: string;
+}
+
+export interface MaterialData {
+  id: string;
+  name: string;
+  color: string;
+  texture?: string;
+  opacity?: number;
+}
+
+export interface FloorPlannerState {
+  walls: WallData[];
+  fixtures: FixtureData[];
+  materials: MaterialData[];
+  selectedWallId: string | null;
+  selectedFixtureId: string | null;
+  isWallDrawingMode: boolean;
+  isFixturePlacementMode: boolean;
+  dimensions: {
+    totalArea: number;
+    totalVolume: number;
+  };
+  lastSavedAt: string | null;
+  wallInProgress: WallData | null;
+  showMeasurements: boolean;
+  showAngles: boolean;
+  snapToGrid: boolean;
+  snapToWalls: boolean;
+  gridVisible: boolean;
+  gridSize: number;
+  gridColor: string;
+  showLabels: boolean;
+  showDimensions: boolean;
+  showGrid: boolean;
+  showRooms: boolean;
+  showWalls: boolean;
+  showFixtures: boolean;
+  showGuides: boolean;
+  showSnapPoints: boolean;
+  showSnapLines: boolean;
+  showSnapAngles: boolean;
+  showSnapGrid: boolean;
+  showSnapWalls: boolean;
+  showSnapRooms: boolean;
+  showSnapFixtures: boolean;
+  showSnapGuides: boolean;
+  showSnapLabels: boolean;
+  showSnapDimensions: boolean;
+  showSnapAnglesGuides: boolean;
+  statistics: {
+    totalArea: number;
+    totalPerimeter: number;
+    totalVolume: number;
+  };
+}
+
+export interface ProjectData {
+  id: string;
+  name: string;
+  description: string;
+  updatedAt: string;
+  createdAt: string;
+}

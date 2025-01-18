@@ -1,511 +1,129 @@
-// src/components/floorplanner/FloorPlanner2D.tsx
-
-import React, { useRef, useEffect, useCallback, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { v4 as uuidv4 } from 'uuid';
-import { AppDispatch, RootState } from '../../store/store';
-import { Point2D, WallData } from '../../types/types';
-import { getDistance, wouldCompleteShape } from '../../utils/geometryUtils';
-import { PIXELS_PER_FOOT, POINT_TOLERANCE } from '../../constants';
-import {
-  startWall,
-  addWall,
-  updateWall,
-  updateWallEnd,
-  finalizeWall,
-  cancelWall,
-  addWallControlPoint,
-  updateLastControlPoint,
-} from '../../store/slices/floorPlannerSlice';
-import { createRectangularRoom } from '../../store/slices/roomToolSlice';
-import { drawWalls, drawInProgressWall, drawRoomPreview } from './drawing';
-import WallEditControls from './WallEditControls';
-import Grid from './Grid'; // Assuming Grid component is in the same directory
+import React, { useRef, useEffect, useState, useCallback } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { RootState, AppDispatch } from "../../store/store";
+import { startWall, updateWallEnd, finishWall } from "../../store/slices/floorPlannerSlice";
+import { snapToGrid } from "../../utils/geometry/snapUtils";
+import { drawWalls, drawInProgressWall } from "./drawing";
 
 const FloorPlanner2D: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dispatch = useDispatch<AppDispatch>();
-  const wallInProgress = useSelector((state: RootState) => state.floorPlanner.wallInProgress);
-  const walls = useSelector((state: RootState) => state.floorPlanner.walls);
-  const { angleSnapEnabled, angleSnapIncrement, selectedTool, showMeasurements } = useSelector((state: RootState) => {
-    console.log('Redux state:', state);
-    console.log('UI state:', state.ui);
-    return state.ui;
-  });
-  const [isAltPressed, setIsAltPressed] = useState(false);
-  const [roomStart, setRoomStart] = useState<Point2D | null>(null);
-  const [mousePos, setMousePos] = useState<Point2D>({ x: 0, y: 0 });
-  const [selectedPoint, setSelectedPoint] = useState<Point2D | null>(null);
-  const [selectedWall, setSelectedWall] = useState<WallData | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState<Point2D | null>(null);
-  const [dragOffset, setDragOffset] = useState<Point2D>({ x: 0, y: 0 });
 
-  // Enhanced redraw function to show selected wall
+  // UI toggles from uiSlice
+  const {
+    snapToGrid: snapEnabled,
+    snapGridSize,
+    angleSnapEnabled,
+    angleSnapIncrement,
+    showRoomLabels,
+    showTooltips
+  } = useSelector((state: RootState) => state.ui);
+
+  const floorPlan = useSelector((state: RootState) => state.floorPlanner.present);
+  const { walls, wallInProgress } = floorPlan;
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      let x = e.clientX - rect.left;
+      let y = e.clientY - rect.top;
+      if (snapEnabled) {
+        const snapped = snapToGrid({ x, y }, snapGridSize);
+        x = snapped.x;
+        y = snapped.y;
+      }
+      // angleSnapEnabled logic might go here in the future
+      // if angleSnapEnabled => do angle-based adjustments with angleSnapIncrement
+
+      if (wallInProgress) {
+        dispatch(updateWallEnd({ ...wallInProgress, end: { x, y } }));
+      }
+    },
+    [dispatch, wallInProgress, snapEnabled, snapGridSize, angleSnapEnabled, angleSnapIncrement]
+  );
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      let x = e.clientX - rect.left;
+      let y = e.clientY - rect.top;
+      if (snapEnabled) {
+        const snapped = snapToGrid({ x, y }, snapGridSize);
+        x = snapped.x;
+        y = snapped.y;
+      }
+
+      if (!wallInProgress) {
+        // Start new wall
+        dispatch(
+          startWall({
+            id: "temp-wall",
+            start: { x, y },
+            end: { x, y },
+            thickness: 10,
+            height: 100,
+            type: "straight"
+          })
+        );
+      } else {
+        // finish the in-progress wall
+        dispatch(updateWallEnd({ ...wallInProgress, end: { x, y } }));
+        dispatch(finishWall());
+      }
+    },
+    [dispatch, wallInProgress, snapEnabled, snapGridSize]
+  );
+
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!ctx || !canvas) return;
-
-    console.log("Redrawing with measurements:", showMeasurements);
-
-    // Get DPI scale
-    const dpr = window.devicePixelRatio || 1;
-    
-    // Set canvas size in device pixels
-    const displayWidth = canvas.clientWidth;
-    const displayHeight = canvas.clientHeight;
-    
-    // Set actual size in memory (scaled for DPI)
-    canvas.width = displayWidth * dpr;
-    canvas.height = displayHeight * dpr;
-    
-    // Scale context for correct drawing
-    ctx.scale(dpr, dpr);
-    
-    // Clear canvas
-    ctx.clearRect(0, 0, displayWidth, displayHeight);
-
-    // Draw existing walls with measurements (if enabled)
-    drawWalls(ctx, walls, showMeasurements);
-
-    // Highlight selected wall
-    if (selectedWall) {
-      ctx.save();
-      ctx.strokeStyle = '#2196f3';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(selectedWall.start.x, selectedWall.start.y);
-      if (selectedWall.controlPoints) {
-        selectedWall.controlPoints.forEach(point => {
-          ctx.lineTo(point.x, point.y);
-        });
-      }
-      ctx.lineTo(selectedWall.end.x, selectedWall.end.y);
-      ctx.stroke();
-      
-      // Draw control points
-      const points = [selectedWall.start, ...(selectedWall.controlPoints || []), selectedWall.end];
-      points.forEach(point => {
-        ctx.beginPath();
-        ctx.arc(point.x, point.y, 5, 0, 2 * Math.PI);
-        ctx.fillStyle = '#2196f3';
-        ctx.fill();
-      });
-      ctx.restore();
-    }
-
-    // Draw wall in progress
-    if (wallInProgress) {
-      drawInProgressWall(ctx, wallInProgress, showMeasurements);
-    }
-
-    // Draw room preview if in room tool mode
-    if (selectedTool === 'room' && roomStart && mousePos) {
-      drawRoomPreview(ctx, roomStart, mousePos, showMeasurements);
-    }
-  }, [walls, wallInProgress, showMeasurements, selectedTool, roomStart, mousePos, selectedWall]);
-
-  // Helper function to snap angles
-  const snapAngle = useCallback((start: Point2D, end: Point2D): Point2D => {
-    if (!angleSnapEnabled) return end;
-
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const angleRad = Math.atan2(dy, dx);
-    const angleDeg = (angleRad * 180) / Math.PI;
-    const snappedDeg = Math.round(angleDeg / angleSnapIncrement) * angleSnapIncrement;
-    const r = Math.sqrt(dx * dx + dy * dy);
-    const snappedRad = (snappedDeg * Math.PI) / 180;
-    return {
-      x: start.x + r * Math.cos(snappedRad),
-      y: start.y + r * Math.sin(snappedRad)
-    };
-  }, [angleSnapEnabled, angleSnapIncrement]);
-
-  const findNearestWallPoint = useCallback((point: Point2D, walls: any[]): Point2D | null => {
-    let nearestPoint: Point2D | null = null;
-    let minDistance = Infinity;
-
-    for (const wall of walls) {
-      const distToStart = getDistance(point, wall.start);
-      const distToEnd = getDistance(point, wall.end);
-
-      if (distToStart < minDistance && distToStart <= POINT_TOLERANCE) {
-        minDistance = distToStart;
-        nearestPoint = wall.start;
-      }
-      if (distToEnd < minDistance && distToEnd <= POINT_TOLERANCE) {
-        minDistance = distToEnd;
-        nearestPoint = wall.end;
-      }
-
-      // Check if point is on the wall
-      const wallVector = { x: wall.end.x - wall.start.x, y: wall.end.y - wall.start.y };
-      const pointVector = { x: point.x - wall.start.x, y: point.y - wall.start.y };
-      const dotProduct = wallVector.x * pointVector.x + wallVector.y * pointVector.y;
-      const wallLengthSquared = wallVector.x * wallVector.x + wallVector.y * wallVector.y;
-      const projection = dotProduct / wallLengthSquared;
-      if (projection >= 0 && projection <= 1) {
-        const projectedPoint = {
-          x: wall.start.x + projection * wallVector.x,
-          y: wall.start.y + projection * wallVector.y
-        };
-        const distance = getDistance(point, projectedPoint);
-        if (distance < minDistance && distance <= POINT_TOLERANCE) {
-          minDistance = distance;
-          nearestPoint = projectedPoint;
-        }
-      }
-    }
-
-    return nearestPoint;
-  }, []);
-
-  const getMousePosition = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-
-    const rect = canvas.getBoundingClientRect();
-    
-    // Get the scale factor between canvas logical size and displayed size
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-
-    // Convert mouse coordinates to canvas coordinates
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
-
-    return { x, y };
-  }, []);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current) return;
-
-    const point = getMousePosition(e);
-    
-    if (selectedTool === 'wall' && wallInProgress) {
-      // First snap to angle
-      const snappedPoint = snapAngle(wallInProgress.start, point);
-      
-      // Then check if we're near any wall or endpoint
-      const nearestPoint = findNearestWallPoint(snappedPoint, walls);
-      const finalPoint = nearestPoint || snappedPoint;
-      
-      if (isAltPressed) {
-        // When Alt is pressed, either update or add control point
-        if (wallInProgress.controlPoints && wallInProgress.controlPoints.length > 0) {
-          dispatch(updateLastControlPoint(finalPoint));
-        } else {
-          dispatch(addWallControlPoint(finalPoint));
-        }
-      } else {
-        // Normal wall end update with snapping
-        dispatch(updateWallEnd(finalPoint));
-      }
-      
-      // Draw snap indicator if we're snapping
-      if (nearestPoint) {
-        const ctx = canvasRef.current.getContext('2d');
-        if (ctx) {
-          ctx.beginPath();
-          ctx.arc(nearestPoint.x, nearestPoint.y, 5, 0, 2 * Math.PI);
-          ctx.fillStyle = '#00ff00';
-          ctx.fill();
-          
-          // Draw line to snap point
-          ctx.beginPath();
-          ctx.moveTo(point.x, point.y);
-          ctx.lineTo(nearestPoint.x, nearestPoint.y);
-          ctx.strokeStyle = '#00ff00';
-          ctx.lineWidth = 1;
-          ctx.setLineDash([5, 5]);
-          ctx.stroke();
-          ctx.setLineDash([]);
-        }
-      }
-    }
-    
-    if (isDragging && selectedWall && dragStart) {
-      const dx = point.x - dragStart.x;
-      const dy = point.y - dragStart.y;
-      
-      // Update wall position
-      const newWall = {
-        ...selectedWall,
-        start: {
-          x: selectedWall.start.x + dx,
-          y: selectedWall.start.y + dy
-        },
-        end: {
-          x: selectedWall.end.x + dx,
-          y: selectedWall.end.y + dy
-        },
-        controlPoints: selectedWall.controlPoints?.map(cp => ({
-          x: cp.x + dx,
-          y: cp.y + dy
-        }))
-      };
-      
-      dispatch(updateWall(newWall));
-      setDragStart(point);
-      return;
-    }
-    
-    setMousePos(point);
-    redraw();
-  }, [dispatch, wallInProgress, isAltPressed, snapAngle, selectedTool, getMousePosition, isDragging, selectedWall, dragStart, walls]);
-
-  const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current) return;
-
-    const point = getMousePosition(e);
-    
-    if (selectedTool === 'select') {
-      const wall = findWallUnderPoint(point);
-      setSelectedWall(wall);
-      if (!wall) {
-        setIsDragging(false);
-        setDragStart(null);
-      }
-      return;
-    }
-    
-    if (selectedTool === 'wall') {
-      console.log('Wall tool active');
-      if (wallInProgress) {
-        console.log('Wall in progress:', wallInProgress);
-        if (isAltPressed) {
-          console.log('Alt pressed, adding control point');
-          dispatch(addWallControlPoint(point));
-        } else {
-          console.log('Creating wall section');
-          // First snap to angle
-          const snappedPoint = snapAngle(wallInProgress.start, point);
-          console.log('Snapped point:', snappedPoint);
-          
-          // Then check if we're near any wall or endpoint
-          const nearestPoint = findNearestWallPoint(snappedPoint, walls);
-          const finalPoint = nearestPoint || snappedPoint;
-          console.log('Final point:', finalPoint);
-          
-          const newWall = {
-            id: uuidv4(),
-            start: wallInProgress.start,
-            end: finalPoint,
-            controlPoints: wallInProgress.controlPoints || [],
-            thickness: 10,
-            height: 280
-          };
-
-          console.log('New wall:', newWall);
-          console.log('Existing walls:', walls);
-
-          // Check if this wall would complete a shape
-          if (wouldCompleteShape(newWall, walls)) {
-            console.log('Completing shape');
-            dispatch(addWall(newWall));
-            dispatch(finalizeWall());
-          } else {
-            console.log('Starting new wall section');
-            dispatch(addWall(newWall));
-            dispatch(startWall(finalPoint));
-          }
-        }
-      } else {
-        // For the first click, also try to snap to existing walls
-        const nearestPoint = findNearestWallPoint(point, walls);
-        const startPoint = nearestPoint || point;
-        console.log('Starting new wall at:', startPoint);
-        dispatch(startWall(startPoint));
-      }
-    } else if (selectedTool === 'room') {
-      console.log('Room tool active:', { roomStart });
-      if (!roomStart) {
-        // For the first click, try to snap to existing walls
-        const nearestPoint = findNearestWallPoint(point, walls);
-        const startPoint = nearestPoint || point;
-        console.log('Setting room start point:', startPoint);
-        setRoomStart(startPoint);
-      } else {
-        // For the second click, apply snapping
-        const nearestPoint = findNearestWallPoint(point, walls);
-        const endPoint = nearestPoint || point;
-        
-        // Create rectangular room using snapped coordinates
-        const width = Math.abs(endPoint.x - roomStart.x);
-        const depth = Math.abs(endPoint.y - roomStart.y);
-        
-        // Convert dimensions to feet for display
-        const widthInFeet = width / PIXELS_PER_FOOT;
-        const depthInFeet = depth / PIXELS_PER_FOOT;
-        console.log(`Room dimensions: ${widthInFeet.toFixed(2)}' x ${depthInFeet.toFixed(2)}'`);
-        
-        // Create room and ensure we stay in room tool mode
-        void dispatch(createRectangularRoom({
-          startX: Math.min(roomStart.x, endPoint.x),
-          startY: Math.min(roomStart.y, endPoint.y),
-          width,
-          depth,
-          thickness: 10,
-          height: 280
-        })).then(() => {
-          console.log('Room creation completed, resetting start point');
-          setRoomStart(null);
-        });
-      }
-    } else {
-      console.log('No tool selected');
-    }
-  }, [dispatch, wallInProgress, isAltPressed, snapAngle, selectedTool, roomStart, getMousePosition, findWallUnderPoint, walls]);
-
-  const findWallUnderPoint = useCallback((point: Point2D): WallData | null => {
-    for (const wall of walls) {
-      const points = [wall.start, ...(wall.controlPoints || []), wall.end];
-      for (let i = 0; i < points.length - 1; i++) {
-        const start = points[i];
-        const end = points[i + 1];
-        const distance = distanceToLineSegment(point, start, end);
-        if (distance <= POINT_TOLERANCE) {
-          return wall;
-        }
-      }
-    }
-    return null;
-  }, [walls]);
-
-  const distanceToLineSegment = (point: Point2D, start: Point2D, end: Point2D): number => {
-    const A = point.x - start.x;
-    const B = point.y - start.y;
-    const C = end.x - start.x;
-    const D = end.y - start.y;
-
-    const dot = A * C + B * D;
-    const lenSq = C * C + D * D;
-    let param = -1;
-
-    if (lenSq !== 0) {
-      param = dot / lenSq;
-    }
-
-    let xx, yy;
-
-    if (param < 0) {
-      xx = start.x;
-      yy = start.y;
-    } else if (param > 1) {
-      xx = end.x;
-      yy = end.y;
-    } else {
-      xx = start.x + param * C;
-      yy = start.y + param * D;
-    }
-
-    const dx = point.x - xx;
-    const dy = point.y - yy;
-
-    return Math.sqrt(dx * dx + dy * dy);
-  };
-
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (selectedTool === 'select' && selectedWall) {
-      setIsDragging(true);
-      const point = getMousePosition(e);
-      setDragStart(point);
-      setDragOffset({
-        x: point.x - selectedWall.start.x,
-        y: point.y - selectedWall.start.y
-      });
-    }
-  }, [selectedTool, selectedWall, getMousePosition]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-    setDragStart(null);
-  }, []);
-
-  // Canvas setup effect
-  useEffect(() => {
-    const canvas = canvasRef.current;
     if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-    const resizeCanvas = () => {
-      const parent = canvas.parentElement;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    drawWalls(ctx, walls, true);
+    if (wallInProgress) {
+      drawInProgressWall(ctx, wallInProgress, true);
+    }
+
+    // If showRoomLabels => we can overlay text for each detected room
+    // If showTooltips => maybe show a tooltip near the mouse or near selected items
+  }, [walls, wallInProgress, showRoomLabels, showTooltips]);
+
+  useEffect(() => {
+    function resizeCanvas() {
+      if (!canvasRef.current) return;
+      const parent = canvasRef.current.parentElement;
       if (!parent) return;
 
       const rect = parent.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      
-      // Set display size (css pixels)
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
-      
-      // Set actual size in memory (scaled for DPI)
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-
+      canvasRef.current.width = rect.width;
+      canvasRef.current.height = rect.height;
       redraw();
-    };
-
+    }
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
-    return () => window.removeEventListener('resize', resizeCanvas);
+    window.addEventListener("resize", resizeCanvas);
+    return () => {
+      window.removeEventListener("resize", resizeCanvas);
+    };
   }, [redraw]);
 
-  // Redraw whenever relevant state changes
   useEffect(() => {
     redraw();
   }, [redraw]);
 
-  // Keyboard event handlers
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        dispatch(cancelWall());
-      } else if (e.key === 'Alt') {
-        setIsAltPressed(true);
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Alt') {
-        setIsAltPressed(false);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [dispatch]);
-
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <Grid width={canvasRef.current?.width || 0} height={canvasRef.current?.height || 0} />
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
       <canvas
         ref={canvasRef}
-        style={{
-          width: '100%',
-          height: '100%',
-          cursor: selectedTool === 'select' ? 'pointer' : 'crosshair'
-        }}
-        onClick={handleCanvasClick}
+        style={{ width: "100%", height: "100%" }}
         onMouseMove={handleMouseMove}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onKeyDown={handleKeyDown}
-        onKeyUp={handleKeyUp}
-        tabIndex={0}
+        onClick={handleClick}
       />
-      {selectedWall && (
-        <WallEditControls
-          wall={selectedWall}
-          onClose={() => setSelectedWall(null)}
-        />
-      )}
     </div>
   );
 };

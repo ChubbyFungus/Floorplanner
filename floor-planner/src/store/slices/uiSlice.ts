@@ -1,36 +1,37 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 export interface UiState {
-  showGrid: boolean;
+  // For grid snapping
   snapToGrid: boolean;
+  snapGridSize: number;         // e.g., default 20px for minor grid
   angleSnapEnabled: boolean;
-  angleSnapIncrement: number;
-  selectedTool: 'wall' | 'room' | 'select' | null;
-  showMeasurements: boolean;
-  errorMessage: string | null;
-  gridSize: number;
+  angleSnapIncrement: number;   // e.g., 15 or 45 degrees
+
+  // Labels/Annotations
+  showRoomLabels: boolean;
+
+  // Additional UI toggles
+  showTooltips: boolean;        // Will help with future tooltips or tutorial overlays
 }
 
 const initialState: UiState = {
-  showGrid: true,
   snapToGrid: true,
+  snapGridSize: 20,
   angleSnapEnabled: true,
   angleSnapIncrement: 45,
-  selectedTool: null,
-  showMeasurements: true,
-  errorMessage: null,
-  gridSize: 20
+  showRoomLabels: true,
+  showTooltips: false
 };
 
 export const uiSlice = createSlice({
-  name: 'ui',
+  name: "ui",
   initialState,
   reducers: {
     toggleGrid: (state) => {
-      state.showGrid = !state.showGrid;
-    },
-    toggleSnapToGrid: (state) => {
       state.snapToGrid = !state.snapToGrid;
+    },
+    setGridSize: (state, action: PayloadAction<number>) => {
+      state.snapGridSize = action.payload;
     },
     toggleAngleSnap: (state) => {
       state.angleSnapEnabled = !state.angleSnapEnabled;
@@ -38,30 +39,22 @@ export const uiSlice = createSlice({
     setAngleSnapIncrement: (state, action: PayloadAction<number>) => {
       state.angleSnapIncrement = action.payload;
     },
-    setSelectedTool: (state, action: PayloadAction<'wall' | 'room' | 'select' | null>) => {
-      state.selectedTool = action.payload;
+    setShowRoomLabels: (state, action: PayloadAction<boolean>) => {
+      state.showRoomLabels = action.payload;
     },
-    toggleMeasurements: (state) => {
-      state.showMeasurements = !state.showMeasurements;
-    },
-    setErrorMessage: (state, action: PayloadAction<string | null>) => {
-      state.errorMessage = action.payload;
-    },
-    setGridSize: (state, action: PayloadAction<number>) => {
-      state.gridSize = action.payload;
+    setShowTooltips: (state, action: PayloadAction<boolean>) => {
+      state.showTooltips = action.payload;
     }
   }
 });
 
 export const {
   toggleGrid,
-  toggleSnapToGrid,
+  setGridSize,
   toggleAngleSnap,
   setAngleSnapIncrement,
-  setSelectedTool,
-  toggleMeasurements,
-  setErrorMessage,
-  setGridSize
+  setShowRoomLabels,
+  setShowTooltips
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

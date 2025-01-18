@@ -12,6 +12,7 @@ import {
   findWallIntersections,
   PIXELS_PER_FOOT
 } from "../../utils/geometryUtils";
+import { AngleGuide } from '../../utils/angleUtils';
 
 // Helper function to draw wall measurement
 function drawWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, offset: number, length?: number, walls?: WallData[]) {
@@ -891,7 +892,8 @@ export function drawWallSegmentMeasurements(ctx: CanvasRenderingContext2D, walls
 export function drawInProgressWall(
   ctx: CanvasRenderingContext2D, 
   wall: WallData,
-  showMeasurements: boolean = true
+  showMeasurements: boolean = true,
+  angleGuides?: AngleGuide[]
 ) {
   ctx.save();
   ctx.strokeStyle = "#333";
@@ -934,6 +936,11 @@ export function drawInProgressWall(
   if (showMeasurements) {
     const length = getDistance(wall.start, wall.end);
     drawWallMeasurement(ctx, wall, -25, length);
+  }
+  
+  // Draw angle guides
+  if (angleGuides) {
+    drawAngleGuides(ctx, angleGuides);
   }
   
   ctx.restore();
@@ -1086,4 +1093,43 @@ function drawLeftWallMeasurement(ctx: CanvasRenderingContext2D, wall: WallData, 
   ctx.textBaseline = 'bottom';
   ctx.fillText(measurement, 0, -5);
   ctx.restore();
+}
+
+// Draw angle guides
+export function drawAngleGuides(
+  ctx: CanvasRenderingContext2D,
+  guides: AngleGuide[]
+) {
+  guides.forEach(guide => {
+    ctx.save();
+    
+    // Set style based on whether the guide is snapped
+    if (guide.isSnapped) {
+      ctx.strokeStyle = '#2196f3';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+    } else {
+      ctx.strokeStyle = '#9e9e9e';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+    }
+
+    // Draw guide line
+    ctx.beginPath();
+    ctx.moveTo(guide.start.x, guide.start.y);
+    ctx.lineTo(guide.end.x, guide.end.y);
+    ctx.stroke();
+
+    // Draw angle label
+    const midX = (guide.start.x + guide.end.x) / 2;
+    const midY = (guide.start.y + guide.end.y) / 2;
+    
+    ctx.fillStyle = guide.isSnapped ? '#2196f3' : '#9e9e9e';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${Math.round(guide.angle)}°`, midX, midY - 15);
+
+    ctx.restore();
+  });
 }
