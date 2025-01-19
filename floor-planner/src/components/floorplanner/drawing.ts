@@ -1,5 +1,5 @@
 import { WallData } from "../../types";
-import { 
+import {
   pixelsToFeetAndInches,
   getDistance
 } from "../../utils/geometryUtils";

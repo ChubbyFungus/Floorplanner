@@ -1,10 +1,11 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { WallData, FixtureData, MaterialData, StraightWallData } from "../../types";
 import { finalizeWallCreation } from "../../services/floorPlannerLogic";
+import { arePointsEqual } from "../../utils/geometryUtils";
 
 /**
  * FloorPlannerState
- * Manages walls, fixtures, materials, and dimension info for the floor plan.
+ * Manages walls, fixtures, materials, dimension info, etc.
  */
 export interface FloorPlannerState {
   walls: WallData[];
@@ -51,13 +52,13 @@ export const floorPlannerSlice = createSlice({
 
     /**
      * updateWallEnd
-     * Updates the endpoint of a wall in progress OR an existing wall.
+     * Updates the endpoint of a wall in progress or modifies an existing wall by ID.
      */
     updateWallEnd: (state, action: PayloadAction<WallData>) => {
-      if (state.wallInProgress?.id === action.payload.id) {
+      if (state.wallInProgress && state.wallInProgress.id === action.payload.id) {
         state.wallInProgress = { ...action.payload };
       } else {
-        const idx = state.walls.findIndex(w => w.id === action.payload.id);
+        const idx = state.walls.findIndex((w) => w.id === action.payload.id);
         if (idx !== -1) {
           state.walls[idx] = { ...action.payload };
         }
@@ -66,7 +67,7 @@ export const floorPlannerSlice = createSlice({
 
     /**
      * finishWall
-     * Finalizes the in-progress wall by delegating to floorPlannerLogic, then clears it.
+     * Finalizes the in-progress wall, delegating duplicate checks to floorPlannerLogic.
      */
     finishWall: (state) => {
       if (state.wallInProgress) {
@@ -75,6 +76,10 @@ export const floorPlannerSlice = createSlice({
       }
     },
 
+    /**
+     * cancelWall
+     * Cancels any in-progress wall drawing (called on ESC).
+     */
     cancelWall: (state) => {
       state.wallInProgress = null;
     },
@@ -88,7 +93,7 @@ export const floorPlannerSlice = createSlice({
     },
 
     deleteWall: (state, action: PayloadAction<string>) => {
-      state.walls = state.walls.filter(w => w.id !== action.payload);
+      state.walls = state.walls.filter((w) => w.id !== action.payload);
       if (state.selectedWallId === action.payload) {
         state.selectedWallId = null;
       }
@@ -106,7 +111,10 @@ export const floorPlannerSlice = createSlice({
      * setDimensions
      * Saves computed area/volume data for the entire floor plan.
      */
-    setDimensions: (state, action: PayloadAction<{ totalArea: number; totalVolume: number }>) => {
+    setDimensions: (
+      state,
+      action: PayloadAction<{ totalArea: number; totalVolume: number }>
+    ) => {
       state.dimensions = action.payload;
     },
 
@@ -115,7 +123,7 @@ export const floorPlannerSlice = createSlice({
     },
 
     updateFixture: (state, action: PayloadAction<FixtureData>) => {
-      const idx = state.fixtures.findIndex(f => f.id === action.payload.id);
+      const idx = state.fixtures.findIndex((f) => f.id === action.payload.id);
       if (idx !== -1) {
         state.fixtures[idx] = action.payload;
       }
@@ -143,7 +151,7 @@ export const floorPlannerSlice = createSlice({
      * Replaces an entire wall's data by ID. Useful for editing thickness, height, etc.
      */
     updateWall: (state, action: PayloadAction<WallData>) => {
-      const index = state.walls.findIndex(w => w.id === action.payload.id);
+      const index = state.walls.findIndex((w) => w.id === action.payload.id);
       if (index !== -1) {
         state.walls[index] = { ...action.payload };
       }
@@ -151,7 +159,7 @@ export const floorPlannerSlice = createSlice({
 
     /**
      * addWall
-     * Appends a brand new wall to the floor plan (not triggered by the 'startWall/finishWall' logic).
+     * Appends a brand new wall to the floor plan (not from 'startWall/finishWall' logic).
      */
     addWall: (state, action: PayloadAction<WallData>) => {
       state.walls.push(action.payload);
@@ -159,10 +167,15 @@ export const floorPlannerSlice = createSlice({
 
     /**
      * splitWall
-     * Removes the original wall, then adds any new walls (e.g., after cutting).
+     * Removes the original wall, then adds new partial walls.
      */
-    splitWall: (state, action: PayloadAction<{ originalWallId: string; newWalls: WallData[] }>) => {
-      state.walls = state.walls.filter(w => w.id !== action.payload.originalWallId);
+    splitWall: (
+      state,
+      action: PayloadAction<{ originalWallId: string; newWalls: WallData[] }>
+    ) => {
+      state.walls = state.walls.filter(
+        (w) => w.id !== action.payload.originalWallId
+      );
       for (const newWall of action.payload.newWalls) {
         state.walls.push(newWall);
       }
@@ -185,7 +198,6 @@ export const {
   updateFixture,
   addMaterial,
   clearCanvas,
-  // newly added exports
   updateWall,
   addWall,
   splitWall

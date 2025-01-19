@@ -4,12 +4,12 @@ import { WallData, FixtureData } from "../../types";
 import { Wall3D } from "./Wall3D";
 import { Fixture3D } from "./Fixture3D";
 import { debugLogger } from "../../utils/debugLogger";
+import { getMinMaxPoints } from "../../utils/scene3DUtils";
 
 /**
  * Scene3DProps
- * -----------
- * @property walls - An array of WallData to be displayed in 3D.
- * @property fixtures - An array of FixtureData to be displayed in 3D.
+ * @property walls - array of WallData
+ * @property fixtures - array of FixtureData
  */
 interface Scene3DProps extends GroupProps {
   walls: WallData[];
@@ -18,12 +18,10 @@ interface Scene3DProps extends GroupProps {
 
 /**
  * Scene3D
- * -------
- * Renders a 3D scene of the floor plan using React Three Fiber.
- * Wrapped with React.memo to minimize re-renders when walls/fixtures are unchanged.
+ * Renders floor plan in 3D with React Three Fiber.
+ * This version does not invert Y; it uses x,y in typical 3D XY-plane.
  */
 const Scene3D: React.FC<Scene3DProps> = memo(({ walls, fixtures, ...groupProps }) => {
-  // Debug: log each time Scene3D re-renders, to see if props are changing
   useEffect(() => {
     debugLogger("Scene3D re-render", {
       wallsCount: walls.length,
@@ -31,21 +29,45 @@ const Scene3D: React.FC<Scene3DProps> = memo(({ walls, fixtures, ...groupProps }
     });
   }, [walls, fixtures]);
 
+  // Compute bounding box to shift scene near origin
+  const { minX, minY } = getMinMaxPoints(walls);
+
   return (
     <group {...groupProps}>
-      {/* Render each wall as a Wall3D component */}
       {walls.map((wall) => (
-        <Wall3D key={wall.id} wall={wall} />
+        <Wall3D
+          key={wall.id}
+          wall={{
+            ...wall,
+            // Shift so minX, minY is near 0,0
+            start: { x: wall.start.x - minX, y: wall.start.y - minY },
+            end: { x: wall.end.x - minX, y: wall.end.y - minY },
+            controlPoints: wall.controlPoints
+              ? wall.controlPoints.map((cp) => ({
+                  x: cp.x - minX,
+                  y: cp.y - minY
+                }))
+              : undefined
+          }}
+        />
       ))}
 
-      {/* Render each fixture as a Fixture3D component */}
       {fixtures.map((fixture) => (
-        <Fixture3D key={fixture.id} fixture={fixture} />
+        <Fixture3D
+          key={fixture.id}
+          fixture={{
+            ...fixture,
+            position: {
+              x: fixture.position.x - minX,
+              y: fixture.position.y - minY
+            }
+          }}
+        />
       ))}
 
-      {/* Simple floor plane */}
+      {/* Large plane for floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[100, 100]} />
+        <planeGeometry args={[1000, 1000]} />
         <meshStandardMaterial color="#f0f0f0" metalness={0.1} roughness={0.9} />
       </mesh>
     </group>
@@ -53,5 +75,4 @@ const Scene3D: React.FC<Scene3DProps> = memo(({ walls, fixtures, ...groupProps }
 });
 
 Scene3D.displayName = "Scene3D";
-
 export default Scene3D;

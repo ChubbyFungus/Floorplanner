@@ -1,9 +1,10 @@
 import { createSlice, PayloadAction, createAsyncThunk } from "@reduxjs/toolkit";
 import { startWall, finishWall } from "./floorPlannerSlice";
-import type { AppDispatch } from "../store";
-import { DEFAULT_WALL_HEIGHT, DEFAULT_WALL_THICKNESS } from "../../constants/dimensions";
-import { Point2D, RoomData, WallData } from "../../types";
+// CHANGED: now import from src/constants.ts (or hardcode if you like)
+import { DEFAULT_WALL_HEIGHT, DEFAULT_WALL_THICKNESS } from "../../constants"; 
 import { v4 as uuidv4 } from "uuid";
+import { Point2D, RoomData, WallData } from "../../types";
+import type { AppDispatch } from "../store";
 
 interface RectangularRoomPoints {
   start: Point2D;
@@ -14,7 +15,11 @@ interface RectangularRoomPoints {
  * createRectangularRoom
  * Skips rectangles smaller than 5x5 in canvas units to avoid partial or single-wall scenarios.
  */
-export const createRectangularRoom = createAsyncThunk<void, RectangularRoomPoints, { dispatch: AppDispatch }>(
+export const createRectangularRoom = createAsyncThunk<
+  void,
+  RectangularRoomPoints,
+  { dispatch: AppDispatch }
+>(
   "roomTool/createRectangularRoom",
   async ({ start, end }, { dispatch }) => {
     const minX = Math.min(start.x, end.x);
@@ -25,7 +30,6 @@ export const createRectangularRoom = createAsyncThunk<void, RectangularRoomPoint
     const width = maxX - minX;
     const depth = maxY - minY;
 
-    // If it's basically tiny or negative, skip
     if (width < 5 || depth < 5) {
       return;
     }

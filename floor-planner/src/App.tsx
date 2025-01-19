@@ -1,8 +1,9 @@
+// src/App.tsx
 import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import Home from "./pages/Home";
-import { FloorPlanner } from "./pages/FloorPlanner";
+import { FloorPlanner } from "./pages/FloorPlanner";  // <--- Named import
 import ProjectManager from "./pages/ProjectManager";
 import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
