@@ -6,11 +6,13 @@ import { RootState } from '../../store/store';
 import Scene3D from './Scene3D';
 
 /**
- * Top-level component: renders <Canvas> and adds R3F controls/lights.
- * Does NOT call R3F hooks here, so no error about "Hooks can only be used within the Canvas component."
+ * FloorPlanner3D
+ * -------------
+ * Renders a 3D view (using React Three Fiber) of the current floor plan, 
+ * including orbit controls and basic lighting.
  */
 const FloorPlanner3D: React.FC = () => {
-  const { walls, fixtures, materials } = useSelector((state: RootState) => state.floorPlanner.present);
+  const { walls, fixtures } = useSelector((state: RootState) => state.floorPlanner.present);
 
   return (
     <div style={{ width: '100%', height: '100%' }}>

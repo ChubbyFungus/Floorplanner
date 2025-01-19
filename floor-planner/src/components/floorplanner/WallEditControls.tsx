@@ -6,7 +6,7 @@ import { Paper, Slider, Button, Typography, Box, IconButton, Tooltip } from '@mu
 import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCutIcon from '@mui/icons-material/ContentCut';
 import { v4 as uuidv4 } from 'uuid';
-import { calculateDistance } from '../../utils/geometryUtils';
+import { getDistance } from '../../utils/geometryUtils';
 
 interface WallEditControlsProps {
   wall: WallData;
@@ -63,7 +63,7 @@ export const WallEditControls: React.FC<WallEditControlsProps> = ({ wall, onClos
   };
 
   // Calculate wall length for display
-  const wallLength = calculateDistance(wall.start, wall.end);
+  const wallLength = getDistance(wall.start, wall.end);
 
   return (
     <Paper 

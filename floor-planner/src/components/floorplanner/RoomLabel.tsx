@@ -3,7 +3,7 @@ import { useDispatch } from 'react-redux';
 import { Paper, Typography, IconButton, TextField } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
-import { RoomData, Point2D } from '../../types/types';
+import { RoomData, Point2D } from '../../types';
 import { setRoomName } from '../../store/slices/roomSlice';
 
 interface RoomLabelProps {
@@ -29,7 +29,7 @@ export const RoomLabel: React.FC<RoomLabelProps> = ({
   };
 
   const handleNameSubmit = () => {
-    dispatch(setRoomName({ roomId: room.id, name: editName }));
+    dispatch(setRoomName({ id: room.id, name: editName }));
     onFinishEdit();
   };
 

@@ -50,6 +50,7 @@ export interface RoomData {
   perimeter: number;
   height: number;
   materialId?: string;
+  walls: string[];  // Array of wall IDs that make up the room
 }
 
 export interface FixtureData {
@@ -66,8 +67,10 @@ export interface MaterialData {
   id: string;
   name: string;
   color: string;
-  texture?: string;
-  opacity?: number;
+  texture?: string;       // For basic textures
+  diffuseMap?: string;    // URL to diffuse texture map
+  normalMap?: string;     // URL to normal texture map
+  opacity?: number;       // For transparent materials
 }
 
 export interface FloorPlannerState {

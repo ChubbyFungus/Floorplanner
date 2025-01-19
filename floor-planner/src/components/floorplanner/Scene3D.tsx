@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import { Group, Shape, ExtrudeGeometry, Vector3, CatmullRomCurve3, BufferGeometry, LineBasicMaterial, Line, BoxGeometry, MeshStandardMaterial, Mesh } from 'three';
 import { RootState } from '../../store/store';
 import { WallData, FixtureData, CurvedWallData } from '../../types';
-import { calculateDistance } from '../../utils/geometryUtils';
+import { getDistance } from '../../utils/geometryUtils';
 import { generateWallPoints } from '../../utils/curveUtils';
 
 interface Scene3DProps {
@@ -33,7 +33,7 @@ const Scene3D: React.FC<Scene3DProps> = ({ walls, fixtures }) => {
       } else {
         // Handle straight walls
         const wallGeometry = new BoxGeometry(
-          calculateDistance(wall.start, wall.end),
+          getDistance(wall.start, wall.end),
           wall.height,
           wall.thickness
         );

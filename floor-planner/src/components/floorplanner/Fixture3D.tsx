@@ -12,8 +12,20 @@ export const Fixture3D: React.FC<Fixture3DProps> = ({ fixture }) => {
   const meshRef = useRef<Mesh>(null);
   const material = useMaterial(fixture.materialId);
 
+  // Debug logging
+  console.log('Fixture object:', {
+    id: fixture.id,
+    name: fixture.name,
+    position: fixture.position,
+    width: fixture.dimensions.width,
+    depth: fixture.dimensions.depth,
+    height: fixture.dimensions.height,
+    rotation: fixture.rotation,
+    materialId: fixture.materialId
+  });
+
   const position3D = useMemo(() => {
-    return [fixture.position.x, fixture.height / 2, -fixture.position.y] as [
+    return [fixture.position.x, fixture.dimensions.height / 2, -fixture.position.y] as [
       number,
       number,
       number
@@ -21,7 +33,6 @@ export const Fixture3D: React.FC<Fixture3DProps> = ({ fixture }) => {
   }, [fixture]);
 
   const rotationY = useMemo(() => {
-    if (!fixture.rotation) return 0;
     return (fixture.rotation * Math.PI) / 180;
   }, [fixture.rotation]);
 
@@ -31,7 +42,7 @@ export const Fixture3D: React.FC<Fixture3DProps> = ({ fixture }) => {
 
   return (
     <mesh ref={meshRef} position={position3D} rotation={[0, rotationY, 0]}>
-      <boxGeometry args={[fixture.width, fixture.height, fixture.depth]} />
+      <boxGeometry args={[fixture.dimensions.width, fixture.dimensions.height, fixture.dimensions.depth]} />
       {material ? (
         <primitive object={material} attach="material" />
       ) : (

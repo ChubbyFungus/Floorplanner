@@ -1,4 +1,4 @@
-import { Point2D, WallData, RoomData } from '../types/types';
+import { Point2D, WallData, RoomData } from '../types';
 import { getDistance, arePointsEqual } from './geometryUtils';
 
 interface WallConnection {

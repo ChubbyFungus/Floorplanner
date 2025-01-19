@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { RoomData, WallData } from "../../types/types";
+import { RoomData, WallData } from "../../types";
 import { findRooms } from "../../utils/roomDetection";
 
 interface RoomState {
@@ -28,9 +28,15 @@ export const roomSlice = createSlice({
       if (index !== -1) {
         state.rooms[index] = action.payload;
       }
+    },
+    setRoomName: (state, action: PayloadAction<{ id: string; name: string }>) => {
+      const room = state.rooms.find(r => r.id === action.payload.id);
+      if (room) {
+        room.name = action.payload.name;
+      }
     }
   }
 });
 
-export const { detectRooms, selectRoom, updateRoom } = roomSlice.actions;
+export const { detectRooms, selectRoom, updateRoom, setRoomName } = roomSlice.actions;
 export default roomSlice.reducer;

@@ -1,4 +1,4 @@
-import { Point2D, WallData } from '../types/types';
+import { Point2D, WallData } from '../types';
 
 export const SNAP_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315, 360];
 export const SNAP_TOLERANCE = 10; // degrees

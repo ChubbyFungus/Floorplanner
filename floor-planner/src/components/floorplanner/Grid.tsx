@@ -9,7 +9,7 @@ interface GridProps {
 
 export const Grid: React.FC<GridProps> = ({ width, height }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { showGrid, gridSize } = useSelector((state: RootState) => state.ui);
+  const { snapToGrid: showGrid, snapGridSize: gridSize } = useSelector((state: RootState) => state.ui);
 
   useEffect(() => {
     const canvas = canvasRef.current;
