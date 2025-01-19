@@ -1,25 +1,35 @@
-import React from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { RootState } from '../../store/store';
 import Scene3D from './Scene3D';
+import { debugLogger } from '../../utils/debugLogger';
 
 /**
  * FloorPlanner3D
  * -------------
- * Renders a 3D view (using React Three Fiber) of the current floor plan, 
+ * Renders a 3D view (using React Three Fiber) of the current floor plan,
  * including orbit controls and basic lighting.
  */
 const FloorPlanner3D: React.FC = () => {
-  const { walls, fixtures } = useSelector((state: RootState) => state.floorPlanner.present);
+  const floorPlanState = useSelector((state: RootState) => state.floorPlanner.present);
+
+  // Memoize walls and fixtures so they don't trigger re-renders unless changed
+  const walls = useMemo(() => floorPlanState.walls, [floorPlanState.walls]);
+  const fixtures = useMemo(() => floorPlanState.fixtures, [floorPlanState.fixtures]);
+
+  // Debug log whenever FloorPlanner3D re-renders
+  useEffect(() => {
+    debugLogger("FloorPlanner3D re-render", {
+      wallsCount: walls.length,
+      fixturesCount: fixtures.length
+    });
+  }, [walls, fixtures]);
 
   return (
     <div style={{ width: '100%', height: '100%' }}>
-      <Canvas
-        camera={{ position: [0, 10, 10], fov: 75 }}
-        style={{ background: '#f0f0f0' }}
-      >
+      <Canvas camera={{ position: [0, 10, 10], fov: 75 }} style={{ background: '#f0f0f0' }}>
         <ambientLight intensity={0.5} />
         <directionalLight position={[10, 10, 5]} intensity={1} />
         <Scene3D walls={walls} fixtures={fixtures} />

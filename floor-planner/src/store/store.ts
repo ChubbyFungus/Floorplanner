@@ -1,4 +1,4 @@
-import { configureStore } from "@reduxjs/toolkit";
+import { configureStore, Middleware } from "@reduxjs/toolkit";
 import undoable, { StateWithHistory } from "redux-undo";
 import floorPlannerReducer, { FloorPlannerState } from "./slices/floorPlannerSlice";
 import uiReducer, { UiState } from "./slices/uiSlice";
@@ -11,6 +11,17 @@ export interface RootState {
   room: ReturnType<typeof roomSlice>;
   projectManager: ReturnType<typeof projectManagerReducer>;
 }
+
+// Custom logging middleware with proper typing
+const loggingMiddleware: Middleware<{}, RootState> = (store) => (next) => (action) => {
+  console.log('=== Redux Action ===');
+  console.log(`[${new Date().toISOString()}] Action:`, action);
+  console.log('Previous state:', store.getState());
+  const result = next(action);
+  console.log('Next state:', store.getState());
+  console.log('==================');
+  return result;
+};
 
 export const store = configureStore({
   reducer: {
@@ -27,7 +38,7 @@ export const store = configureStore({
           "floorPlanner/updateFixture",
           "floorPlanner/clearCanvas"
         ];
-        return trackable.includes(action.type);
+        return typeof action.type === 'string' && trackable.includes(action.type);
       }
     }),
     ui: uiReducer,
@@ -37,7 +48,7 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: false
-    })
+    }).concat(loggingMiddleware)
 });
 
 // For typed usage in components

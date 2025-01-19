@@ -1,10 +1,15 @@
-import React, { useRef, useEffect, useCallback } from "react";
+import React, { useRef, useEffect, useCallback, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
-import { startWall, updateWallEnd, finishWall } from "../../store/slices/floorPlannerSlice";
+import {
+  startWall,
+  updateWallEnd,
+  finishWall
+} from "../../store/slices/floorPlannerSlice";
+import { createRectangularRoom } from "../../store/slices/roomToolSlice";
 import { snapToGrid } from "../../utils/geometryUtils";
 import { drawWalls, drawInProgressWall } from "./drawing";
-import { WallData } from "../../types";
+import { WallData, Point2D } from "../../types";
 
 /**
  * Optional props for the FloorPlanner2D component.
@@ -17,32 +22,31 @@ interface FloorPlanner2DProps {
 /**
  * FloorPlanner2D
  * -------------
- * This component renders the 2D canvas for user interaction:
- * - Mouse/Touch events to place or finish walls.
- * - Snapping (grid-based, angle-based) handled via UI toggles from Redux.
- * - Real-time drawing of in-progress walls plus measurements from `drawing.ts`.
- *
- * The actual data model (walls, fixtures, etc.) lives in the Redux store, ensuring this
- * component remains primarily a "view/controller" layer for user input and rendering.
+ * Renders the 2D canvas for user interaction.
+ * - Mouse/Touch events for walls or room creation.
+ * - Grid-based snapping if enabled.
+ * - Real-time drawing for wall in progress & room preview rectangle.
  */
 const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({ onWallSelect }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dispatch = useDispatch<AppDispatch>();
+  const [roomClickStart, setRoomClickStart] = useState<Point2D | null>(null);
+  const [roomPreviewEnd, setRoomPreviewEnd] = useState<Point2D | null>(null);
 
-  // Grab UI toggles and floorPlan data from Redux
+  const uiState = useSelector((state: RootState) => state.ui);
+  const selectedTool = uiState.selectedTool;
   const {
     snapToGrid: snapEnabled,
-    snapGridSize,
-    angleSnapEnabled,
-    angleSnapIncrement
-  } = useSelector((state: RootState) => state.ui);
+    snapGridSize
+  } = uiState;
+
   const floorPlan = useSelector((state: RootState) => state.floorPlanner.present);
   const { walls, wallInProgress } = floorPlan;
 
   /**
    * handleMouseMove
-   * Updates the "wall in progress" endpoint as the user moves the mouse,
-   * optionally snapping the coordinates to grid if enabled.
+   * - Update wall in progress if "wall" tool is active.
+   * - Show a dashed room preview if "room" tool is active & we have a start point.
    */
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -52,31 +56,41 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({ onWallSelect }) => {
       let x = e.clientX - rect.left;
       let y = e.clientY - rect.top;
 
-      // Snap to grid if toggled on
       if (snapEnabled) {
         const snapped = snapToGrid({ x, y }, snapGridSize);
         x = snapped.x;
         y = snapped.y;
       }
 
-      // Future angle snapping logic could be added here if angleSnapEnabled is true.
+      // WALL TOOL: if a wall is in progress, update its end
+      if (selectedTool === "wall" && wallInProgress) {
+        dispatch(
+          updateWallEnd({
+            ...wallInProgress,
+            end: { x, y }
+          })
+        );
+      }
 
-      // If a wall is being drawn, update its end coordinate
-      if (wallInProgress) {
-        dispatch(updateWallEnd({
-          ...wallInProgress,
-          end: { x, y }
-        }));
+      // ROOM TOOL: if we have a start point, store a "previewEnd"
+      if (selectedTool === "room" && roomClickStart) {
+        setRoomPreviewEnd({ x, y });
       }
     },
-    [dispatch, wallInProgress, snapEnabled, snapGridSize, angleSnapEnabled, angleSnapIncrement]
+    [
+      dispatch,
+      wallInProgress,
+      snapEnabled,
+      snapGridSize,
+      selectedTool,
+      roomClickStart
+    ]
   );
 
   /**
    * handleClick
-   * On click:
-   * - If no wall is in progress, start a new one at the clicked point.
-   * - Otherwise, finalize the existing wall by setting its endpoint and dispatching finishWall().
+   * - If the tool is "wall," do start/finish logic.
+   * - If the tool is "room," do two-click rectangle creation.
    */
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -92,30 +106,57 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({ onWallSelect }) => {
         y = snapped.y;
       }
 
-      if (!wallInProgress) {
-        dispatch(startWall({
-          id: "temp-wall",
-          start: { x, y },
-          end: { x, y },
-          thickness: 10,
-          height: 100,
-          type: "straight"
-        }));
-      } else {
-        // Finalize in-progress wall
-        dispatch(updateWallEnd({
-          ...wallInProgress,
-          end: { x, y }
-        }));
-        dispatch(finishWall());
+      // ROOM TOOL
+      if (selectedTool === "room") {
+        if (!roomClickStart) {
+          setRoomClickStart({ x, y });
+          setRoomPreviewEnd({ x, y });
+        } else {
+          // second click -> createRectangularRoom
+          dispatch(createRectangularRoom({ start: roomClickStart, end: { x, y } }));
+          setRoomClickStart(null);
+          setRoomPreviewEnd(null);
+        }
+        return;
+      }
+
+      // WALL TOOL
+      if (selectedTool === "wall") {
+        if (!wallInProgress) {
+          dispatch(
+            startWall({
+              id: "temp-wall",
+              type: "straight",
+              start: { x, y },
+              end: { x, y },
+              thickness: 10,
+              height: 100
+            })
+          );
+        } else {
+          dispatch(
+            updateWallEnd({
+              ...wallInProgress,
+              end: { x, y }
+            })
+          );
+          dispatch(finishWall());
+        }
       }
     },
-    [dispatch, wallInProgress, snapEnabled, snapGridSize]
+    [
+      dispatch,
+      wallInProgress,
+      snapEnabled,
+      snapGridSize,
+      selectedTool,
+      roomClickStart
+    ]
   );
 
   /**
    * redraw
-   * Clears the canvas and re-draws all existing walls + the in-progress wall (if any).
+   * Clears the canvas and draws existing walls + in-progress walls + room rectangle preview.
    */
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -123,33 +164,52 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({ onWallSelect }) => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Clear the entire drawing area
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw existing walls, optionally with measurements
+    // Draw existing walls
     drawWalls(ctx, walls, true);
 
-    // If there's a wall being drawn, display it in a dashed style
-    if (wallInProgress) {
+    // Draw wall in progress
+    if (selectedTool === "wall" && wallInProgress) {
       drawInProgressWall(ctx, wallInProgress, true);
     }
-  }, [walls, wallInProgress]);
+
+    // Draw a dashed rectangle if we're in "room" mode and have a start + preview
+    if (selectedTool === "room" && roomClickStart && roomPreviewEnd) {
+      const startX = roomClickStart.x;
+      const startY = roomClickStart.y;
+      const endX = roomPreviewEnd.x;
+      const endY = roomPreviewEnd.y;
+
+      ctx.save();
+      ctx.setLineDash([5, 3]);
+      ctx.strokeStyle = "#888";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.rect(
+        Math.min(startX, endX),
+        Math.min(startY, endY),
+        Math.abs(endX - startX),
+        Math.abs(endY - startY)
+      );
+      ctx.stroke();
+      ctx.restore();
+    }
+  }, [walls, wallInProgress, selectedTool, roomClickStart, roomPreviewEnd]);
 
   /**
-   * On mount or resize, set canvas dimensions to match the parent element.
-   * Re-apply drawing calls afterward.
+   * On mount/resize, set canvas dimensions and redraw.
    */
   useEffect(() => {
-    function resizeCanvas() {
+    const resizeCanvas = () => {
       if (!canvasRef.current) return;
       const parent = canvasRef.current.parentElement;
       if (!parent) return;
-
       const rect = parent.getBoundingClientRect();
       canvasRef.current.width = rect.width;
       canvasRef.current.height = rect.height;
       redraw();
-    }
+    };
     resizeCanvas();
     window.addEventListener("resize", resizeCanvas);
     return () => {
@@ -157,20 +217,19 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({ onWallSelect }) => {
     };
   }, [redraw]);
 
-  // Whenever walls or wallInProgress changes, re-draw
+  // Redraw on relevant state changes
   useEffect(() => {
     redraw();
   }, [redraw]);
 
   /**
    * handleDoubleClick
-   * If we implement selection logic, double-click can detect a wall near the pointer
-   * and call onWallSelect if provided. Currently just a stub.
+   * If a wall is near pointer, call onWallSelect. (Stub)
    */
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (onWallSelect) {
-        // Example: We could do some pixel-based hit detection to find the nearest wall
+        // You could do a pixel-based hit detection to find nearest wall
         // onWallSelect(nearestWall);
       }
     },

@@ -1,108 +1,57 @@
-import React, { useRef, useMemo, useEffect } from 'react';
-import { useSelector } from 'react-redux';
-import { Group, Shape, ExtrudeGeometry, Vector3, CatmullRomCurve3, BufferGeometry, LineBasicMaterial, Line, BoxGeometry, MeshStandardMaterial, Mesh } from 'three';
-import { RootState } from '../../store/store';
-import { WallData, FixtureData, CurvedWallData } from '../../types';
-import { getDistance } from '../../utils/geometryUtils';
-import { generateWallPoints } from '../../utils/curveUtils';
+import React, { memo, useEffect } from "react";
+import { GroupProps } from "@react-three/fiber";
+import { WallData, FixtureData } from "../../types";
+import { Wall3D } from "./Wall3D";
+import { Fixture3D } from "./Fixture3D";
+import { debugLogger } from "../../utils/debugLogger";
 
-interface Scene3DProps {
-  walls: (WallData | CurvedWallData)[];
+/**
+ * Scene3DProps
+ * -----------
+ * @property walls - An array of WallData to be displayed in 3D.
+ * @property fixtures - An array of FixtureData to be displayed in 3D.
+ */
+interface Scene3DProps extends GroupProps {
+  walls: WallData[];
   fixtures: FixtureData[];
 }
 
-const Scene3D: React.FC<Scene3DProps> = ({ walls, fixtures }) => {
-  const groupRef = useRef<Group>(null);
-  const { materials } = useSelector((state: RootState) => state.floorPlanner.present);
-
+/**
+ * Scene3D
+ * -------
+ * Renders a 3D scene of the floor plan using React Three Fiber.
+ * Wrapped with React.memo to minimize re-renders when walls/fixtures are unchanged.
+ */
+const Scene3D: React.FC<Scene3DProps> = memo(({ walls, fixtures, ...groupProps }) => {
+  // Debug: log each time Scene3D re-renders, to see if props are changing
   useEffect(() => {
-    walls.forEach(wall => {
-      if (wall.type === 'curved') {
-        // Handle curved walls
-        const curve = new CatmullRomCurve3([
-          new Vector3(wall.start.x, 0, wall.start.y),
-          new Vector3(wall.controlPoint.x, 0, wall.controlPoint.y),
-          new Vector3(wall.end.x, 0, wall.end.y)
-        ]);
-        
-        const points = curve.getPoints(50);
-        const geometry = new BufferGeometry().setFromPoints(points);
-        const material = new LineBasicMaterial({ color: 0x000000 });
-        const curvedWall = new Line(geometry, material);
-        groupRef.current?.add(curvedWall);
-      } else {
-        // Handle straight walls
-        const wallGeometry = new BoxGeometry(
-          getDistance(wall.start, wall.end),
-          wall.height,
-          wall.thickness
-        );
-
-        const wallMaterial = new MeshStandardMaterial({
-          color: 0xcccccc,
-          roughness: 0.7,
-          metalness: 0.1
-        });
-
-        const wallMesh = new Mesh(wallGeometry, wallMaterial);
-
-        // Position and rotate wall
-        const midPoint = {
-          x: (wall.start.x + wall.end.x) / 2,
-          y: (wall.start.y + wall.end.y) / 2
-        };
-
-        wallMesh.position.set(midPoint.x, wall.height / 2, midPoint.y);
-        wallMesh.rotation.y = Math.atan2(
-          wall.end.y - wall.start.y,
-          wall.end.x - wall.start.x
-        );
-
-        groupRef.current?.add(wallMesh);
-      }
+    debugLogger("Scene3D re-render", {
+      wallsCount: walls.length,
+      fixturesCount: fixtures.length
     });
-  }, [walls]);
-
-  useEffect(() => {
-    fixtures.forEach(fixture => {
-      const { dimensions } = fixture;
-      const fixtureGeometry = new BoxGeometry(
-        dimensions.width,
-        dimensions.height,
-        dimensions.depth
-      );
-
-      const fixtureMaterial = new MeshStandardMaterial({
-        color: 0x4444ff,
-        roughness: 0.5,
-        metalness: 0.2
-      });
-
-      const fixtureMesh = new Mesh(fixtureGeometry, fixtureMaterial);
-      fixtureMesh.position.set(
-        fixture.position.x,
-        dimensions.height / 2,
-        fixture.position.y
-      );
-      fixtureMesh.rotation.y = fixture.rotation;
-
-      groupRef.current?.add(fixtureMesh);
-    });
-  }, [fixtures]);
+  }, [walls, fixtures]);
 
   return (
-    <group ref={groupRef}>
-      {/* Floor */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+    <group {...groupProps}>
+      {/* Render each wall as a Wall3D component */}
+      {walls.map((wall) => (
+        <Wall3D key={wall.id} wall={wall} />
+      ))}
+
+      {/* Render each fixture as a Fixture3D component */}
+      {fixtures.map((fixture) => (
+        <Fixture3D key={fixture.id} fixture={fixture} />
+      ))}
+
+      {/* Simple floor plane */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[100, 100]} />
-        <meshStandardMaterial 
-          color="#f0f0f0"
-          metalness={0.1}
-          roughness={0.9}
-        />
+        <meshStandardMaterial color="#f0f0f0" metalness={0.1} roughness={0.9} />
       </mesh>
     </group>
   );
-};
+});
+
+Scene3D.displayName = "Scene3D";
 
 export default Scene3D;

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import Home from "./pages/Home";
@@ -19,7 +19,19 @@ const theme = createTheme({
   }
 });
 
+let appRenderCount = 0;
+
 function App() {
+  useEffect(() => {
+    appRenderCount++;
+    console.log("=====================================");
+    console.log(`[${new Date().toISOString()}] App render #${appRenderCount}`);
+    console.log("=====================================");
+    return () => {
+      console.log(`[${new Date().toISOString()}] App cleanup #${appRenderCount}`);
+    };
+  });
+
   return (
     <ThemeProvider theme={theme}>
       <Router>
