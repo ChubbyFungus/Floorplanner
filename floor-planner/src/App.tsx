@@ -1,22 +1,31 @@
-// src/App.tsx
 import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
-import Home from "./pages/Home";
-import { FloorPlanner } from "./pages/FloorPlanner";  // <--- Named import
+import { FloorPlanner } from "./pages/FloorPlanner";
 import ProjectManager from "./pages/ProjectManager";
 import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
 
 const theme = createTheme({
   palette: {
-    mode: "light",
+    mode: "dark",
     primary: {
-      main: "#1976d2"
+      main: "#d4af37" // gold accent
     },
     secondary: {
-      main: "#f50057"
+      main: "#FFFFFF"
+    },
+    background: {
+      default: "#0B0B0B",
+      paper: "#171717"
+    },
+    text: {
+      primary: "#FFFFFF",
+      secondary: "#d4af37"
     }
+  },
+  typography: {
+    fontFamily: "serif"
   }
 });
 
@@ -38,8 +47,7 @@ function App() {
       <Router>
         <Header />
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/floor-planner" element={<FloorPlanner />} />
+          <Route path="/" element={<FloorPlanner />} />
           <Route path="/projects" element={<ProjectManager />} />
         </Routes>
         <Footer />

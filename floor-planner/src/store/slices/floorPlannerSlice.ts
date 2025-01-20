@@ -159,10 +159,20 @@ export const floorPlannerSlice = createSlice({
 
     /**
      * addWall
-     * Appends a brand new wall to the floor plan (not from 'startWall/finishWall' logic).
+     * Appends a single new wall to the floor plan.
      */
     addWall: (state, action: PayloadAction<WallData>) => {
-      state.walls.push(action.payload);
+      finalizeWallCreation(action.payload, state.walls);
+    },
+
+    /**
+     * addWalls
+     * Appends multiple walls as one grouped action to allow single-step undo for e.g. rooms.
+     */
+    addWalls: (state, action: PayloadAction<WallData[]>) => {
+      action.payload.forEach((wallData) => {
+        finalizeWallCreation(wallData, state.walls);
+      });
     },
 
     /**
@@ -177,7 +187,7 @@ export const floorPlannerSlice = createSlice({
         (w) => w.id !== action.payload.originalWallId
       );
       for (const newWall of action.payload.newWalls) {
-        state.walls.push(newWall);
+        finalizeWallCreation(newWall, state.walls);
       }
     }
   }
@@ -200,6 +210,7 @@ export const {
   clearCanvas,
   updateWall,
   addWall,
+  addWalls,
   splitWall
 } = floorPlannerSlice.actions;
 

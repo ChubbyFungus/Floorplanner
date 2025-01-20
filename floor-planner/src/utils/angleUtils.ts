@@ -1,7 +1,8 @@
 import { Point2D, WallData } from '../types';
 
 export const SNAP_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315, 360];
-export const SNAP_TOLERANCE = 10; // degrees
+// Increase tolerance to strengthen snap
+export const SNAP_TOLERANCE = 20; 
 
 export type AngleType = 'parallel' | 'perpendicular' | 'standard';
 
@@ -40,7 +41,7 @@ export const findNearestSnapAngle = (
     }
   });
 
-  // Check existing wall angles for parallel and perpendicular snapping
+  // Check existing wall angles for parallel and perpendicular
   existingWalls.forEach(wall => {
     const wallAngle = calculateAngle(wall.start, wall.end);
     
@@ -102,6 +103,7 @@ export const generateAngleGuides = (
     const diff = Math.abs(currentAngle - snapAngle);
     const diffWrapped = Math.min(diff, 360 - diff);
     
+    // Show guides if we're within roughly double the tolerance
     if (diffWrapped < SNAP_TOLERANCE * 2) {
       const angleInRadians = (snapAngle * Math.PI) / 180;
       const guideEnd = {
@@ -119,7 +121,7 @@ export const generateAngleGuides = (
     }
   });
 
-  // Add guides for parallel and perpendicular walls
+  // Add guides for parallel and perpendicular
   existingWalls.forEach(wall => {
     const wallAngle = calculateAngle(wall.start, wall.end);
     const angles = [

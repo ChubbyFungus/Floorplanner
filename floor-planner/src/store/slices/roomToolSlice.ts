@@ -1,6 +1,5 @@
 import { createSlice, PayloadAction, createAsyncThunk } from "@reduxjs/toolkit";
-import { startWall, finishWall } from "./floorPlannerSlice";
-// CHANGED: now import from src/constants.ts (or hardcode if you like)
+import { addWalls } from "./floorPlannerSlice";
 import { DEFAULT_WALL_HEIGHT, DEFAULT_WALL_THICKNESS } from "../../constants"; 
 import { v4 as uuidv4 } from "uuid";
 import { Point2D, RoomData, WallData } from "../../types";
@@ -14,6 +13,7 @@ interface RectangularRoomPoints {
 /**
  * createRectangularRoom
  * Skips rectangles smaller than 5x5 in canvas units to avoid partial or single-wall scenarios.
+ * Now uses addWalls so that the entire set of walls can be undone at once.
  */
 export const createRectangularRoom = createAsyncThunk<
   void,
@@ -69,10 +69,8 @@ export const createRectangularRoom = createAsyncThunk<
       }
     ];
 
-    for (const w of walls) {
-      dispatch(startWall(w));
-      dispatch(finishWall());
-    }
+    // Instead of multiple startWall/finishWall calls, just add them at once
+    dispatch(addWalls(walls));
   }
 );
 

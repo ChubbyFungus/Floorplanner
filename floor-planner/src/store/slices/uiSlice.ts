@@ -1,14 +1,10 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
-/**
- * UiState
- * Includes snapping toggles, angle snap settings, plus any error or tool selection flags.
- */
 export interface UiState {
   showGrid: boolean;
   snapToGrid: boolean;
   snapGridSize: number;
-  angleSnapEnabled: boolean;
+  angleSnapEnabled: boolean; // still used internally
   angleSnapIncrement: number;
   showRoomLabels: boolean;
   showTooltips: boolean;
@@ -16,6 +12,10 @@ export interface UiState {
   selectedTool: "wall" | "room" | "select" | null;
   errorMessage: string | null;
   showMeasurements: boolean;
+
+  // New fields
+  tapeMeasureActive: boolean;
+  aiTipsOpen: boolean;
 }
 
 const initialState: UiState = {
@@ -26,12 +26,12 @@ const initialState: UiState = {
   angleSnapIncrement: 45,
   showRoomLabels: true,
   showTooltips: false,
-
-  // Default to 'select' now, instead of null
   selectedTool: "select",
-
   errorMessage: null,
-  showMeasurements: false
+  showMeasurements: false,
+
+  tapeMeasureActive: false,
+  aiTipsOpen: false
 };
 
 export const uiSlice = createSlice({
@@ -67,6 +67,13 @@ export const uiSlice = createSlice({
     },
     setShowTooltips: (state, action: PayloadAction<boolean>) => {
       state.showTooltips = action.payload;
+    },
+    // New toggles
+    toggleTapeMeasure: (state) => {
+      state.tapeMeasureActive = !state.tapeMeasureActive;
+    },
+    toggleAiTips: (state) => {
+      state.aiTipsOpen = !state.aiTipsOpen;
     }
   }
 });
@@ -80,7 +87,9 @@ export const {
   toggleAngleSnap,
   setAngleSnapIncrement,
   setShowRoomLabels,
-  setShowTooltips
+  setShowTooltips,
+  toggleTapeMeasure,
+  toggleAiTips
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

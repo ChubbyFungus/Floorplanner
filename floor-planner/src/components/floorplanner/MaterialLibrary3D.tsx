@@ -1,12 +1,17 @@
 import React, {
   createContext,
   useContext,
-  useMemo,
-  PropsWithChildren
+  PropsWithChildren,
+  useMemo
 } from "react";
 import { TextureLoader, MeshStandardMaterial, Texture } from "three";
 import { MaterialData } from "../../types";
 import { useLoader } from "@react-three/fiber";
+
+/**
+ * MaterialLibrary3D
+ * - Now handles invalid or empty texture URLs gracefully.
+ */
 
 interface MaterialLibraryProps {
   materials: MaterialData[];
@@ -18,15 +23,6 @@ interface MaterialMap {
 
 const MaterialLibraryContext = createContext<MaterialMap>({});
 
-/**
- * MaterialLibrary3D
- * Provides a React context for referencing preloaded 3D materials by ID.
- * 
- * Usage:
- * <MaterialLibrary3D materials={someMaterials}>
- *   <Your3DScene />
- * </MaterialLibrary3D>
- */
 export const MaterialLibrary3D: React.FC<PropsWithChildren<MaterialLibraryProps>> = ({
   materials,
   children
@@ -34,33 +30,32 @@ export const MaterialLibrary3D: React.FC<PropsWithChildren<MaterialLibraryProps>
   const diffuseURLs = materials.map((m) => m.diffuseMap || "");
   const normalURLs = materials.map((m) => m.normalMap || "");
 
-  // These arrays align with the materials array
-  const loadedDiffuse = useLoader(TextureLoader, diffuseURLs) as Texture[];
-  const loadedNormal = useLoader(TextureLoader, normalURLs) as Texture[];
+  // Try/catch to handle possible loader errors
+  let loadedDiffuse: Texture[] = [];
+  let loadedNormal: Texture[] = [];
+  try {
+    loadedDiffuse = useLoader(TextureLoader, diffuseURLs) as Texture[];
+    loadedNormal = useLoader(TextureLoader, normalURLs) as Texture[];
+  } catch (err) {
+    // fallback empty arrays
+    loadedDiffuse = [];
+    loadedNormal = [];
+  }
 
-  /**
-   * Build a map of MeshStandardMaterial keyed by material ID.
-   */
   const materialMap: MaterialMap = useMemo(() => {
     const map: MaterialMap = {};
     materials.forEach((matData, index) => {
-      const diffuseURL = matData.diffuseMap || "";
-      const normalURL = matData.normalMap || "";
-      const diffuseTexture = diffuseURL ? loadedDiffuse[index] : null;
-      const normalTexture = normalURL ? loadedNormal[index] : null;
-
-      const mat = new MeshStandardMaterial({
-        color: matData.color || "#ffffff"
-      });
-      if (diffuseTexture) {
-        mat.map = diffuseTexture;
+      const colorVal = matData.color || "#ffffff";
+      const mat = new MeshStandardMaterial({ color: colorVal });
+      if (diffuseURLs[index]) {
+        mat.map = loadedDiffuse[index];
         if (mat.map) {
-          mat.map.wrapS = 1000; // RepeatWrapping if needed
+          mat.map.wrapS = 1000;
           mat.map.wrapT = 1000;
         }
       }
-      if (normalTexture) {
-        mat.normalMap = normalTexture;
+      if (normalURLs[index]) {
+        mat.normalMap = loadedNormal[index];
         if (mat.normalMap) {
           mat.normalMap.wrapS = 1000;
           mat.normalMap.wrapT = 1000;
@@ -69,7 +64,7 @@ export const MaterialLibrary3D: React.FC<PropsWithChildren<MaterialLibraryProps>
       map[matData.id] = mat;
     });
     return map;
-  }, [materials, loadedDiffuse, loadedNormal]);
+  }, [materials, loadedDiffuse, loadedNormal, diffuseURLs, normalURLs]);
 
   return (
     <MaterialLibraryContext.Provider value={materialMap}>
@@ -78,10 +73,6 @@ export const MaterialLibrary3D: React.FC<PropsWithChildren<MaterialLibraryProps>
   );
 };
 
-/**
- * useMaterial
- * Hook for retrieving a preloaded MeshStandardMaterial by materialId.
- */
 export function useMaterial(materialId?: string): MeshStandardMaterial | null {
   const map = useContext(MaterialLibraryContext);
   if (!materialId) return null;

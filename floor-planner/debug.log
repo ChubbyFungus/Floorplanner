@@ -1,5 +1,5 @@
-[2025-01-19T17:46:54.318Z] Starting debug log
-[2025-01-19T17:46:54.336Z][log] 
+[2025-01-20T01:00:47.734Z] Starting debug log
+[2025-01-20T01:00:47.749Z][log] 
 
 
 
@@ -11,26 +11,13 @@
 
 
 
-[2025-01-19T17:46:54.337Z][log] 
-  [32m[1mVITE[22m v4.5.5[39m  [2mready in [0m[1m571[22m[2m[0m ms[22m
+[2025-01-20T01:00:47.750Z][log] 
+  [32m[1mVITE[22m v4.5.5[39m  [2mready in [0m[1m231[22m[2m[0m ms[22m
 
-[2025-01-19T17:46:54.337Z][log]   [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m3000[22m/[39m
-[2025-01-19T17:46:54.338Z][log]   [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.1.192:[1m3000[22m/[39m
-[2025-01-19T17:46:54.338Z][log] [2m[32m  ➜[39m[22m[2m  press [22m[1mh[22m[2m to show help[22m
-[2025-01-19T18:28:56.897Z][log] 
-
-
-
-
-
-
-
-
-
-
-
-[2025-01-19T18:28:56.900Z][log] [2m11:28:56 AM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/store/slices/floorPlannerSlice.ts[22m
-[2025-01-19T18:28:56.902Z][log] 
+[2025-01-20T01:00:47.751Z][log]   [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m3000[22m/[39m
+[2025-01-20T01:00:47.751Z][log]   [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.1.192:[1m3000[22m/[39m
+[2025-01-20T01:00:47.751Z][log] [2m[32m  ➜[39m[22m[2m  press [22m[1mh[22m[2m to show help[22m
+[2025-01-20T01:09:46.191Z][log] 
 
 
 
@@ -42,4 +29,71 @@
 
 
 
-[2025-01-19T18:28:56.903Z][log] [2m11:28:56 AM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/services/floorPlannerLogic.ts[22m
+[2025-01-20T01:09:46.192Z][log] [2m6:09:46 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx[22m
+[2025-01-20T01:09:46.193Z][log] 
+
+
+
+
+
+
+
+
+
+
+
+[2025-01-20T01:09:46.194Z][log] [2m6:09:46 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/FloorPlanner.tsx[22m
+[2025-01-20T01:09:46.203Z][log] 
+
+
+
+
+
+
+
+
+
+
+
+[2025-01-20T01:09:46.203Z][log] [2m6:09:46 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Home.tsx[22m
+[2025-01-20T01:09:48.697Z][log] [2m6:09:48 PM[22m [36m[1m[vite][22m[39m [32m✨ new dependencies optimized: [33m@mui/icons-material/Straighten[32m[39m
+[2025-01-20T01:09:48.698Z][log] [2m6:09:48 PM[22m [36m[1m[vite][22m[39m [32m✨ optimized dependencies changed. reloading[39m
+[2025-01-20T01:09:58.064Z][log] 
+
+
+
+
+
+
+
+
+
+
+
+[2025-01-20T01:09:58.067Z][log] [2m6:09:58 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Home.tsx[22m
+[2025-01-20T05:10:12.618Z][log] 
+
+
+
+
+
+
+
+
+
+
+
+[2025-01-20T05:10:12.632Z][log] [2m10:10:12 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/FloorPlanner.tsx[22m
+[2025-01-20T05:10:12.662Z][log] 
+
+
+
+
+
+
+
+
+
+
+
+[2025-01-20T05:10:12.663Z][log] [2m10:10:12 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/FloorPlanner.tsx[22m [33m(x2)[39m

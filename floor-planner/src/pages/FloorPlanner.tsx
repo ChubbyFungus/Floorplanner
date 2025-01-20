@@ -1,4 +1,4 @@
-// src/pages/FloorPlanner.tsx
+import StraightenIcon from "@mui/icons-material/Straighten";
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { ActionCreators as UndoActionCreators } from "redux-undo";
@@ -6,81 +6,129 @@ import { RootState } from "../store/store";
 import {
   toggleGrid,
   toggleSnapToGrid,
-  toggleAngleSnap,
-  setAngleSnapIncrement,
+  toggleMeasurements,
+  toggleTapeMeasure,
+  toggleAiTips,
   setSelectedTool,
-  setErrorMessage,
-  toggleMeasurements
+  setErrorMessage
 } from "../store/slices/uiSlice";
 import {
   clearCanvas,
-  setDimensions,
-  cancelWall
+  cancelWall,
+  deleteWall
 } from "../store/slices/floorPlannerSlice";
-import { calculateAreaAndVolume } from "../utils/geometryUtils";
+import {
+  calculateAreaAndVolume
+} from "../utils/geometryUtils";
 import {
   Box,
   Container,
   Typography,
-  Button,
+  IconButton,
+  Tooltip,
   Alert,
-  Slider,
-  Stack
+  styled
 } from "@mui/material";
+import {
+  GridOn as GridOnIcon,
+  GridOff as GridOffIcon,
+  Straighten as MeasureIcon,
+  Lightbulb as TipsIcon,
+  ThreeDRotation as ThreeDIcon,
+  Replay as RedoIcon,
+  Undo as UndoIcon,
+  DeleteForever as ClearIcon,
+  Architecture as RoomIcon,
+  CropSquare as WallIcon,
+  TouchApp as SelectIcon
+} from "@mui/icons-material";
 import FloorPlanner2D from "../components/floorplanner/FloorPlanner2D";
 import FloorPlanner3D from "../components/floorplanner/FloorPlanner3D";
-import WallEditControls from "../components/floorplanner/WallEditControls";
-import { WallData, RoomData, FixtureData } from "../types";
+import { WallData, RoomData } from "../types";
 import { cancelRoom } from "../store/slices/roomToolSlice";
-import SelectedItemPanel from "../components/floorplanner/SelectedItemPanel";
+import PropertiesPanel from "../components/floorplanner/PropertiesPanel";
+import CommonRoomShapesMenu from "../components/floorplanner/CommonRoomShapesMenu";
+import AiDesignTipsPanel from "../components/floorplanner/AiDesignTipsPanel";
 
 type ViewMode = "2D" | "3D";
 
+/**
+ * Styled components for the 3D "keycap" style.
+ */
+const ToolbarContainer = styled(Box)(() => ({
+  display: "flex",
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 12,
+  marginBottom: 16,
+  backgroundColor: "#171717",
+  padding: 8,
+  borderRadius: 12,
+  boxShadow: "inset 1px 1px 2px rgba(255,255,255,0.05), inset -1px -1px 3px rgba(0,0,0,0.8)",
+  justifyContent: "flex-start",
+  // Slight gradient for a subtle “metallic” or “plastic” look:
+  background: "linear-gradient(145deg, #101010, #1c1c1c)",
+  position: "relative"
+}));
+
+const KeycapIconButton = styled(IconButton)(() => ({
+  color: "#999",
+  backgroundColor: "#222",
+  borderRadius: 8,
+  padding: 8,
+  // 3D keycap effect:
+  boxShadow:
+    "inset 2px 2px 3px rgba(0,0,0,0.7), inset -1px -1px 2px rgba(255,255,255,0.05), 2px 2px 5px rgba(0,0,0,0.8)",
+  transition: "transform 0.1s ease, box-shadow 0.2s ease",
+  "&:hover": {
+    color: "#fff",
+    backgroundColor: "#2d2d2d",
+    boxShadow:
+      "inset 2px 2px 3px rgba(0,0,0,0.8), inset -1px -1px 2px rgba(255,255,255,0.07), 1px 1px 6px rgba(0,0,0,0.95)",
+    transform: "translateY(-1px)"
+  },
+  "&:active": {
+    transform: "translateY(1px)",
+    boxShadow:
+      "inset 2px 2px 3px rgba(0,0,0,0.85), inset -1px -1px 2px rgba(255,255,255,0.02)"
+  }
+}));
+
 export function FloorPlanner() {
   const dispatch = useDispatch();
-
-  // UI slice
   const ui = useSelector((state: RootState) => state.ui);
   const {
-    angleSnapEnabled,
-    angleSnapIncrement,
     showGrid,
     snapToGrid,
-    selectedTool,
     showMeasurements,
+    tapeMeasureActive,
+    aiTipsOpen,
+    selectedTool,
     errorMessage
   } = ui;
 
-  // FloorPlanner slice (with undoable present)
   const floorPlannerState = useSelector((state: RootState) => state.floorPlanner.present);
   const { walls, fixtures, dimensions } = floorPlannerState;
 
-  // RoomTool slice
   const roomToolState = useSelector((state: RootState) => state.roomTool);
   const { rooms } = roomToolState;
 
   const [viewMode, setViewMode] = useState<ViewMode>("2D");
 
-  // We'll track a selected item (wall, room, fixture) for the panel
-  const [selectedWall, setSelectedWall] = useState<WallData | null>(null);
-  const [selectedRoom, setSelectedRoom] = useState<RoomData | null>(null);
-  const [selectedFixture, setSelectedFixture] = useState<FixtureData | null>(null);
-
-  // Recompute total area/volume if walls/fixtures/rooms change
   useEffect(() => {
     const { totalArea, totalVolume } = calculateAreaAndVolume(walls, fixtures, rooms);
-    dispatch(setDimensions({ totalArea, totalVolume }));
+    dispatch({
+      type: "floorPlanner/setDimensions",
+      payload: { totalArea, totalVolume }
+    });
   }, [walls, fixtures, rooms, dispatch]);
 
-  // KeyDown for undo/redo/clear/escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Undo
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
         e.preventDefault();
         dispatch(UndoActionCreators.undo());
       }
-      // Redo
       if (
         (e.ctrlKey || e.metaKey) &&
         ((e.key === "z" && e.shiftKey) || e.key === "y")
@@ -88,20 +136,13 @@ export function FloorPlanner() {
         e.preventDefault();
         dispatch(UndoActionCreators.redo());
       }
-      // Clear
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "c") {
         e.preventDefault();
-        if (
-          window.confirm(
-            "Are you sure you want to clear the canvas? This action can be undone."
-          )
-        ) {
+        if (window.confirm("Are you sure you want to clear the canvas? This action can be undone.")) {
           dispatch(clearCanvas());
         }
       }
-      // Escape to cancel current drawing
       if (e.key === "Escape") {
-        // If in wall mode or room mode, we cancel and revert to select
         if (selectedTool === "wall") {
           dispatch(cancelWall());
           dispatch(setSelectedTool("select"));
@@ -110,35 +151,24 @@ export function FloorPlanner() {
           dispatch(setSelectedTool("select"));
         }
       }
+      if (e.key === "Backspace") {
+        if (floorPlannerState.selectedWallId) {
+          dispatch(deleteWall(floorPlannerState.selectedWallId));
+        }
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [dispatch, selectedTool]);
+  }, [dispatch, selectedTool, floorPlannerState.selectedWallId]);
 
-  const handleToggleGrid = () => {
-    dispatch(toggleGrid());
-  };
-
-  const handleToggleSnap = () => {
-    dispatch(toggleSnapToGrid());
-  };
-
-  const handleToggleAngleSnap = () => {
-    dispatch(toggleAngleSnap());
-  };
-
-  const handleToggleMeasurements = () => {
-    dispatch(toggleMeasurements());
-  };
-
-  const handleAngleSnapChange = (_: any, value: number | number[]) => {
-    if (typeof value === "number") {
-      dispatch(setAngleSnapIncrement(value));
-    }
-  };
+  const handleToggleGrid = () => dispatch(toggleGrid());
+  const handleToggleSnap = () => dispatch(toggleSnapToGrid());
+  const handleToggleMeasurements = () => dispatch(toggleMeasurements());
+  const handleToggleTapeMeasure = () => dispatch(toggleTapeMeasure());
+  const handleToggleAiTips = () => dispatch(toggleAiTips());
 
   const handleToggleView = () => {
     setViewMode((prev) => (prev === "2D" ? "3D" : "2D"));
@@ -153,11 +183,7 @@ export function FloorPlanner() {
   };
 
   const handleClearCanvas = () => {
-    if (
-      window.confirm(
-        "Are you sure you want to clear the canvas? This action can be undone."
-      )
-    ) {
+    if (window.confirm("Are you sure you want to clear the canvas? This action can be undone.")) {
       dispatch(clearCanvas());
     }
   };
@@ -174,152 +200,220 @@ export function FloorPlanner() {
     dispatch(setErrorMessage(null));
   };
 
-  // Called by FloorPlanner2D when a wall is clicked
   const handleWallSelect = (wall: WallData) => {
-    setSelectedWall(wall);
-    setSelectedRoom(null);
-    setSelectedFixture(null);
+    // handle highlight if desired
   };
 
-  const handleCloseWallEdit = () => {
-    setSelectedWall(null);
+  const handleRoomSelect = (room: RoomData) => {
+    // handle highlight if desired
   };
 
   return (
-    <Container maxWidth="xl" sx={{ marginTop: 4 }}>
-      {errorMessage && (
-        <Alert severity="error" onClose={handleCloseError}>
-          {errorMessage}
-        </Alert>
-      )}
+    <Box sx={{ backgroundColor: "#0B0B0B", color: "#FFF", minHeight: "100vh", pb: 4 }}>
+      <Container maxWidth="xl" sx={{ py: 4 }}>
+        {errorMessage && (
+          <Alert severity="error" onClose={handleCloseError}>
+            {errorMessage}
+          </Alert>
+        )}
 
-      <Stack direction="row" spacing={2} flexWrap="wrap" marginBottom={2}>
-        <Button variant="contained" onClick={handleToggleGrid}>
-          {showGrid ? "Hide Grid" : "Show Grid"}
-        </Button>
+        {/* Updated 3D "keycap" toolbar container */}
+        <ToolbarContainer>
+          {/* Show/Hide Grid */}
+          <Tooltip title={showGrid ? "Hide Grid" : "Show Grid"} arrow>
+            <KeycapIconButton
+              onClick={handleToggleGrid}
+              sx={{
+                color: showGrid ? "#d4af37" : "#999"
+              }}
+            >
+              {showGrid ? <GridOnIcon /> : <GridOffIcon />}
+            </KeycapIconButton>
+          </Tooltip>
 
-        <Button variant="contained" onClick={handleToggleSnap}>
-          {snapToGrid ? "Disable Grid Snap" : "Enable Grid Snap"}
-        </Button>
+          {/* Snap to Grid */}
+          <Tooltip title={snapToGrid ? "Disable Grid Snap" : "Enable Grid Snap"} arrow>
+            <KeycapIconButton
+              onClick={handleToggleSnap}
+              sx={{
+                color: snapToGrid ? "#d4af37" : "#999"
+              }}
+            >
+              <GridOnIcon />
+            </KeycapIconButton>
+          </Tooltip>
 
-        <Button variant="contained" onClick={handleToggleAngleSnap}>
-          {angleSnapEnabled ? "Disable Angle Snap" : "Enable Angle Snap"}
-        </Button>
+          {/* Show Measurements */}
+          <Tooltip title={showMeasurements ? "Hide Measurements" : "Show Measurements"} arrow>
+            <KeycapIconButton
+              onClick={handleToggleMeasurements}
+              sx={{
+                color: showMeasurements ? "#d4af37" : "#999"
+              }}
+            >
+              <MeasureIcon />
+            </KeycapIconButton>
+          </Tooltip>
 
-        <Button variant="contained" onClick={handleToggleMeasurements}>
-          {showMeasurements ? "Hide Measurements" : "Show Measurements"}
-        </Button>
+          {/* Tape Measure */}
+          <Tooltip title={tapeMeasureActive ? "Close Tape Measure" : "Tape Measure"} arrow>
+            <KeycapIconButton
+              onClick={handleToggleTapeMeasure}
+              sx={{
+                color: tapeMeasureActive ? "#d4af37" : "#999"
+              }}
+            >
+              <StraightenIcon />
+            </KeycapIconButton>
+          </Tooltip>
 
-        <Box width={180} ml={2}>
-          <Typography variant="body2" gutterBottom>
-            Angle Snap Inc
+          {/* AI Design Tips */}
+          <Tooltip title={aiTipsOpen ? "Hide AI Tips" : "AI Design Tips"} arrow>
+            <KeycapIconButton
+              onClick={handleToggleAiTips}
+              sx={{
+                color: aiTipsOpen ? "#d4af37" : "#999"
+              }}
+            >
+              <TipsIcon />
+            </KeycapIconButton>
+          </Tooltip>
+
+          {/* Switch 2D / 3D */}
+          <Tooltip title={`Switch to ${viewMode === "2D" ? "3D" : "2D"} View`} arrow>
+            <KeycapIconButton>
+              <ThreeDIcon onClick={handleToggleView} />
+            </KeycapIconButton>
+          </Tooltip>
+
+          {/* Undo */}
+          <Tooltip title="Undo" arrow>
+            <KeycapIconButton onClick={handleUndo}>
+              <UndoIcon />
+            </KeycapIconButton>
+          </Tooltip>
+
+          {/* Redo */}
+          <Tooltip title="Redo" arrow>
+            <KeycapIconButton onClick={handleRedo}>
+              <RedoIcon />
+            </KeycapIconButton>
+          </Tooltip>
+
+          {/* Clear Canvas */}
+          <Tooltip title="Clear Canvas" arrow>
+            <KeycapIconButton
+              onClick={handleClearCanvas}
+              sx={{
+                color: "#e03030"
+              }}
+            >
+              <ClearIcon />
+            </KeycapIconButton>
+          </Tooltip>
+
+          {/* Wall Tool */}
+          <Tooltip title="Wall Tool" arrow>
+            <KeycapIconButton
+              onClick={() => handleToolSelect("wall")}
+              sx={{
+                color: selectedTool === "wall" ? "#d4af37" : "#999"
+              }}
+            >
+              <WallIcon />
+            </KeycapIconButton>
+          </Tooltip>
+
+          {/* Room Tool */}
+          <Tooltip title="Room Tool" arrow>
+            <KeycapIconButton
+              onClick={() => handleToolSelect("room")}
+              sx={{
+                color: selectedTool === "room" ? "#d4af37" : "#999"
+              }}
+            >
+              <RoomIcon />
+            </KeycapIconButton>
+          </Tooltip>
+
+          {/* Select Tool */}
+          <Tooltip title="Select Tool" arrow>
+            <KeycapIconButton
+              onClick={() => handleToolSelect("select")}
+              sx={{
+                color: selectedTool === "select" ? "#d4af37" : "#999"
+              }}
+            >
+              <SelectIcon />
+            </KeycapIconButton>
+          </Tooltip>
+
+          {/* Common Shapes Menu */}
+          <CommonRoomShapesMenu />
+        </ToolbarContainer>
+
+        <Box mb={2}>
+          <Typography
+            variant="h6"
+            sx={{ fontFamily: "serif", mb: 1, color: "#fff" }}
+          >
+            Your Floor Plan Summary
           </Typography>
-          <Slider
-            min={1}
-            max={90}
-            step={1}
-            value={angleSnapIncrement}
-            onChange={handleAngleSnapChange}
-            valueLabelDisplay="auto"
-          />
+          <Typography variant="body1">
+            Total Area: {Math.round(dimensions.totalArea)} sq ft
+          </Typography>
+          <Typography variant="body1">
+            Total Volume: {Math.round(dimensions.totalVolume)} cubic ft
+          </Typography>
         </Box>
 
-        <Button variant="contained" onClick={handleToggleView}>
-          Switch to {viewMode === "2D" ? "3D" : "2D"} View
-        </Button>
-
-        <Button variant="outlined" onClick={handleUndo}>
-          Undo
-        </Button>
-        <Button variant="outlined" onClick={handleRedo}>
-          Redo
-        </Button>
-        <Button variant="outlined" color="error" onClick={handleClearCanvas}>
-          Clear Canvas
-        </Button>
-      </Stack>
-
-      <Box mb={2}>
-        <Stack direction="row" spacing={2}>
-          <Button
-            variant={selectedTool === "wall" ? "contained" : "outlined"}
-            onClick={() => handleToolSelect("wall")}
-          >
-            Wall Tool
-          </Button>
-          <Button
-            variant={selectedTool === "room" ? "contained" : "outlined"}
-            onClick={() => handleToolSelect("room")}
-          >
-            Room Tool
-          </Button>
-          <Button
-            variant={selectedTool === "select" ? "contained" : "outlined"}
-            onClick={() => handleToolSelect("select")}
-          >
-            Select Tool
-          </Button>
-        </Stack>
-      </Box>
-
-      <Box mb={2}>
-        <Typography variant="body1">
-          Total Area: {Math.round(dimensions.totalArea)} sq ft
-        </Typography>
-      </Box>
-
-      {viewMode === "2D" ? (
-        <>
-          <Typography variant="h6" gutterBottom>
-            2D Floor Planner
-          </Typography>
+        <Box sx={{ display: "flex", flexDirection: "row", height: "calc(100vh - 350px)" }}>
           <Box
             sx={{
-              height: "calc(100vh - 300px)",
-              border: "1px solid #ccc",
+              flex: 1,
+              border: "1px solid #444",
               overflow: "hidden",
               position: "relative"
             }}
           >
-            <FloorPlanner2D
-              onWallSelect={handleWallSelect}
-              showMeasurements={showMeasurements}
-              angleSnapEnabled={angleSnapEnabled}
-              angleSnapIncrement={angleSnapIncrement}
-              showGrid={showGrid}
-            />
-            {selectedWall && (
-              <Box
-                sx={{
-                  position: "absolute",
-                  top: 16,
-                  right: 16,
-                  zIndex: 1000
-                }}
-              >
-                <WallEditControls wall={selectedWall} onClose={handleCloseWallEdit} />
-              </Box>
-            )}
-            {/* Selected item details panel */}
-            {(selectedWall || selectedRoom || selectedFixture) && (
-              <SelectedItemPanel
-                wall={selectedWall}
-                room={selectedRoom}
-                fixture={selectedFixture}
-              />
+            {viewMode === "2D" ? (
+              <>
+                <Typography
+                  variant="h6"
+                  gutterBottom
+                  sx={{ fontFamily: "serif", backgroundColor: "#171717", p: 1 }}
+                >
+                  2D Floor Planner
+                </Typography>
+                <FloorPlanner2D
+                  onWallSelect={handleWallSelect}
+                  onRoomSelect={handleRoomSelect}
+                  showMeasurements={showMeasurements}
+                  angleSnapEnabled={true}
+                  showGrid={showGrid}
+                />
+              </>
+            ) : (
+              <>
+                <Typography
+                  variant="h6"
+                  gutterBottom
+                  sx={{ fontFamily: "serif", backgroundColor: "#171717", p: 1 }}
+                >
+                  3D Visualization
+                </Typography>
+                <Box sx={{ width: "100%", height: "100%" }}>
+                  <FloorPlanner3D />
+                </Box>
+              </>
             )}
           </Box>
-        </>
-      ) : (
-        <>
-          <Typography variant="h6" gutterBottom>
-            3D Visualization
-          </Typography>
-          <Box height={600} border="1px solid #ccc">
-            <FloorPlanner3D />
-          </Box>
-        </>
-      )}
-    </Container>
+
+          <PropertiesPanel />
+        </Box>
+
+        {aiTipsOpen && <AiDesignTipsPanel />}
+      </Container>
+    </Box>
   );
 }
