@@ -4,11 +4,9 @@ import { Link } from "react-router-dom";
 import MenuIcon from "@mui/icons-material/Menu";
 
 /**
- * Minimal, sleek Header:
- * - Smaller toolbar height
- * - Text buttons with minimal padding
- * - Subtle highlight on hover (transparent background)
- * - Thinner font sizes for a "less bulky" feel
+ * Updated Header:
+ * - Navy background
+ * - Champagne accent color
  */
 
 export default function Header() {
@@ -16,14 +14,14 @@ export default function Header() {
     <AppBar
       position="static"
       sx={{
-        backgroundColor: "transparent",
-        boxShadow: "none",
-        borderBottom: "1px solid #333"
+        backgroundColor: "#0b1c44",
+        boxShadow: "0 4px 8px rgba(0,0,0,0.8)",
+        borderBottom: "1px solid #2a345a"
       }}
     >
       <Toolbar
         sx={{
-          minHeight: 48, // reduced height
+          minHeight: 56,
           display: "flex",
           justifyContent: "space-between",
           px: 2
@@ -37,8 +35,13 @@ export default function Header() {
             aria-label="menu"
             sx={{
               mr: 1,
-              color: "#d4af37",
-              "&:hover": { backgroundColor: "transparent" }
+              color: "#e5d2b3",
+              transition: "transform 0.2s",
+              "&:hover": {
+                color: "#fff",
+                backgroundColor: "transparent",
+                transform: "scale(1.05)"
+              }
             }}
           >
             <MenuIcon fontSize="small" />
@@ -48,8 +51,8 @@ export default function Header() {
             sx={{
               fontFamily: "serif",
               fontWeight: "bold",
-              color: "#d4af37",
-              fontSize: "1.1rem" // smaller text
+              color: "#e5d2b3",
+              fontSize: "1.2rem"
             }}
           >
             Wish Granted Kitchens
@@ -57,7 +60,7 @@ export default function Header() {
         </Box>
 
         {/* Right Section / Navigation */}
-        <Box display="flex" alignItems="center" gap={2}>
+        <Box display="flex" alignItems="center" gap={3}>
           <Button
             component={Link}
             to="/floor-planner"
@@ -65,11 +68,11 @@ export default function Header() {
             disableElevation
             variant="text"
             sx={{
-              color: "#d4af37",
+              color: "#e5d2b3",
               textTransform: "none",
               fontFamily: "serif",
-              fontSize: "0.9rem",
-              p: 0, // remove default padding
+              fontSize: "0.95rem",
+              p: 0,
               "&:hover": {
                 backgroundColor: "transparent",
                 color: "#fff"
@@ -85,10 +88,10 @@ export default function Header() {
             disableElevation
             variant="text"
             sx={{
-              color: "#d4af37",
+              color: "#e5d2b3",
               textTransform: "none",
               fontFamily: "serif",
-              fontSize: "0.9rem",
+              fontSize: "0.95rem",
               p: 0,
               "&:hover": {
                 backgroundColor: "transparent",
@@ -105,10 +108,10 @@ export default function Header() {
             disableElevation
             variant="text"
             sx={{
-              color: "#d4af37",
+              color: "#e5d2b3",
               textTransform: "none",
               fontFamily: "serif",
-              fontSize: "0.9rem",
+              fontSize: "0.95rem",
               p: 0,
               "&:hover": {
                 backgroundColor: "transparent",

@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
-import undoable, { StateWithHistory } from 'redux-undo';
+import undoable, { StateWithHistory, ActionCreators as UndoActionCreators } from 'redux-undo';
 import floorPlannerReducer, {
   FloorPlannerState,
+  addWalls,
   startWall,
   finishWall,
   updateWallEnd,
@@ -10,16 +11,15 @@ import floorPlannerReducer, {
   deleteWall,
   setDimensions
 } from '../store/slices/floorPlannerSlice';
-import { addWalls } from '../store/slices/floorPlannerSlice';
 
-interface TestState {
+interface TestRootState {
   floorPlanner: StateWithHistory<FloorPlannerState>;
 }
 
 describe('floorPlannerSlice', () => {
   let store: ReturnType<typeof configureTestStore>;
 
-  const configureTestStore = () => {
+  function configureTestStore() {
     return configureStore({
       reducer: {
         floorPlanner: undoable(floorPlannerReducer, {
@@ -28,7 +28,7 @@ describe('floorPlannerSlice', () => {
         })
       }
     });
-  };
+  }
 
   beforeEach(() => {
     store = configureTestStore();
@@ -145,6 +145,7 @@ describe('floorPlannerSlice', () => {
   });
 
   it('undo/redo works for actions', () => {
+    // Add a wall
     store.dispatch(
       addWalls([
         {
@@ -159,12 +160,12 @@ describe('floorPlannerSlice', () => {
     );
     expect(store.getState().floorPlanner.present.walls.length).toBe(1);
 
-    // Undo
-    store.dispatch({ type: 'UNDO' });
+    // Undo the wall creation
+    store.dispatch(UndoActionCreators.undo());
     expect(store.getState().floorPlanner.present.walls.length).toBe(0);
 
-    // Redo
-    store.dispatch({ type: 'REDO' });
+    // Redo the wall creation
+    store.dispatch(UndoActionCreators.redo());
     expect(store.getState().floorPlanner.present.walls.length).toBe(1);
   });
 });

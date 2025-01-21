@@ -82,7 +82,7 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
   const { walls, wallInProgress, selectedWallId } = floorPlan;
 
   const roomState = useSelector((state: RootState) => state.room);
-  const { rooms, selectedRoomId } = roomState;
+  const { rooms } = roomState;
 
   const [roomClickStart, setRoomClickStart] = useState<Point2D | null>(null);
   const [roomPreviewEnd, setRoomPreviewEnd] = useState<Point2D | null>(null);
@@ -489,7 +489,14 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
     >
       <canvas
         ref={canvasRef}
-        style={{ position: "relative", width: "100%", height: "100%", zIndex: 2 }}
+        style={{
+          position: "relative",
+          width: "100%",
+          height: "100%",
+          zIndex: 2,
+          /* Set background to grey: */
+          backgroundColor: "#ccc"
+        }}
         onMouseMove={handleMouseMove}
         onClick={handleClick}
         onContextMenu={handleContextMenu}

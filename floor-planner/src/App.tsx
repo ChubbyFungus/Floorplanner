@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
-import { FloorPlanner } from "./pages/FloorPlanner";
+import { FloorPlanner } from "./pages/FloorPlanner"; // Named import matches "export function FloorPlanner"
 import ProjectManager from "./pages/ProjectManager";
 import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
@@ -10,7 +10,7 @@ const theme = createTheme({
   palette: {
     mode: "dark",
     primary: {
-      main: "#d4af37" // gold accent
+      main: "#d4af37"
     },
     secondary: {
       main: "#FFFFFF"

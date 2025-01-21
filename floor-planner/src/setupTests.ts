@@ -1,23 +1,50 @@
-// jest-dom adds custom jest matchers for asserting on DOM nodes.
-// allows you to do things like:
-// expect(element).toHaveTextContent(/react/i)
-// learn more: https://github.com/testing-library/jest-dom
-import '@testing-library/jest-dom';
-import { vi } from 'vitest';
+// src/setupTests.ts
+/**
+ * We stub out getContext("2d") and getContext("webgl") so that libraries
+ * like Lottie or React Three Fiber won't crash on "not implemented" errors.
+ * This is a minimal, fake canvas context approach that stops the test from failing.
+ */
 
-// Mock canvas methods
-const mockCanvasContext = {
-  clearRect: vi.fn(),
-  beginPath: vi.fn(),
-  moveTo: vi.fn(),
-  lineTo: vi.fn(),
-  stroke: vi.fn(),
-  fillRect: vi.fn(),
-  setLineDash: vi.fn(),
-  arc: vi.fn(),
-  fill: vi.fn(),
-  closePath: vi.fn(),
-};
+if (typeof HTMLCanvasElement !== 'undefined') {
+  const originalGetContext = HTMLCanvasElement.prototype.getContext;
 
-// @ts-ignore
-HTMLCanvasElement.prototype.getContext = () => mockCanvasContext;
+  HTMLCanvasElement.prototype.getContext = function (
+    type: string,
+    ...args: any[]
+  ) {
+    // If requesting "2d", return a minimal mock object
+    if (type === '2d') {
+      return {
+        fillStyle: '#000',
+        strokeStyle: '#000',
+        lineWidth: 1,
+        fillRect: () => {},
+        strokeRect: () => {},
+        beginPath: () => {},
+        moveTo: () => {},
+        lineTo: () => {},
+        arc: () => {},
+        closePath: () => {},
+        fill: () => {},
+        stroke: () => {},
+        measureText: () => ({ width: 0 }),
+        // ... add stubs for any other methods Lottie might call
+      };
+    }
+
+    // If requesting "webgl" or "webgl2", return a minimal mock
+    if (type === 'webgl' || type === 'webgl2') {
+      return {
+        // minimal mock for Three.js
+        getExtension: () => null,
+        activeTexture: () => {},
+        bindTexture: () => {},
+        texImage2D: () => {},
+        // ... more stubs if needed
+      };
+    }
+
+    // fallback for other context types (like "2d", "bitmaprenderer", etc.)
+    return originalGetContext.apply(this, [type, ...args]);
+  };
+}
