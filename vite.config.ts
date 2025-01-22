@@ -37,6 +37,11 @@ const logToFile = () => ({
 
 export default defineConfig({
   plugins: [react(), logToFile()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src')
+    }
+  },
   server: {
     open: true,
     port: 3000,

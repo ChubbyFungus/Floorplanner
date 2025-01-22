@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
     "types": ["cypress", "node"],
-    // Make sure "jsx" is either "react" or "react-jsx"
     "jsx": "react-jsx",
     "target": "ES2020",
     "lib": ["DOM", "DOM.Iterable", "ES2020"],
@@ -12,18 +11,20 @@
     "strict": true,
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
-    // Ensures .tsx is recognized
     "allowJs": false,
     "noEmit": true,
     "isolatedModules": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": [
     "src",
     "cypress",
     "cypress/support/*.d.ts",
     "cypress/e2e/**/*.ts",
-    // Optionally ensure tests are included
     "src/tests"
   ],
   "exclude": ["node_modules", "dist"]
