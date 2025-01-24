@@ -1,20 +1,11 @@
 import React, { useEffect, useRef } from "react";
-import { Paper, List, ListItemButton, ListItemText } from "@mui/material";
+import { Paper, List, ListItemButton, ListItemText, ListItemIcon } from "@mui/material";
 import { useDispatch } from "react-redux";
-import { splitWall, deleteWall, addWall, updateWall } from "../../store/slices/floorPlannerSlice";
-import { CurvedWallData, Point2D, StraightWallData, WallData } from "../../types";
+import { splitWall, deleteWall, updateWall } from "../../store/slices/floorPlannerSlice";
+import { CurvedWallData, Point2D, WallData } from "../../types";
 import { v4 as uuidv4 } from "uuid";
-
-/**
- * WallContextMenu
- * ---------------
- * Displays a small pop-up menu when the user right-clicks (or otherwise triggers context) on a wall,
- * offering the following:
- *  - "Split Wall" at the clicked point
- *  - "Create Wall from Here" (start a new wall from the clicked point)
- *  - "Curve Wall" (convert to a curved wall)
- *  - "Delete Wall"
- */
+// We'll import a trash icon from lucide-react for the Delete
+import { Trash2 } from "lucide-react";
 
 interface WallContextMenuProps {
   open: boolean;
@@ -22,7 +13,7 @@ interface WallContextMenuProps {
   wall: WallData | null;
   clickPoint: Point2D | null;
   onClose: () => void;
-  onStartNewWall?: (startPoint: Point2D) => void; // If we want immediate new wall creation
+  onStartNewWall?: (startPoint: Point2D) => void;
 }
 
 const MENU_WIDTH = 160;
@@ -41,7 +32,6 @@ const WallContextMenu: React.FC<WallContextMenuProps> = ({
   useEffect(() => {
     if (!open) return;
 
-    // Close menu on outside click
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onClose();
@@ -58,8 +48,9 @@ const WallContextMenu: React.FC<WallContextMenuProps> = ({
   }
 
   const handleSplitWall = () => {
-    if (!wall || !clickPoint) return;
-    // We'll split the wall at the clicked point, creating two new walls.
+    if (!wall) return;
+    if (!clickPoint) return;
+
     const newWallId1 = uuidv4();
     const newWallId2 = uuidv4();
 
@@ -80,28 +71,21 @@ const WallContextMenu: React.FC<WallContextMenuProps> = ({
 
   const handleCreateWallFromHere = () => {
     if (!clickPoint) return;
-    // Start a new wall from the clicked point. Optionally, we can split the old wall as well.
-    // For now, let's also do a split so the user doesn't lose continuity.
     handleSplitWall();
-
-    // Then call some callback to start a new in-progress wall from clickPoint
     onStartNewWall?.(clickPoint);
   };
 
   const handleCurveWall = () => {
     if (!wall) return;
-    // Convert a straight wall to a curved wall with a simple control point at the midpoint
     const midX = (wall.start.x + wall.end.x) / 2;
     const midY = (wall.start.y + wall.end.y) / 2;
-    const controlPoint: Point2D = { x: midX, y: midY + 40 }; // Basic offset for demonstration
+    const controlPoint: Point2D = { x: midX, y: midY + 40 };
 
-    // Build a new curved wall using the old wall's data
     const curved: CurvedWallData = {
       ...wall,
       type: "curved",
       controlPoints: [controlPoint]
     };
-
     dispatch(updateWall(curved));
     onClose();
   };
@@ -135,7 +119,10 @@ const WallContextMenu: React.FC<WallContextMenuProps> = ({
           <ListItemText primary="Curve Wall" />
         </ListItemButton>
         <ListItemButton onClick={handleDeleteWall}>
-          <ListItemText primary="Delete Wall" />
+          <ListItemIcon>
+            <Trash2 size={16} />
+          </ListItemIcon>
+          <ListItemText primary="Delete" />
         </ListItemButton>
       </List>
     </Paper>

@@ -1,28 +1,32 @@
 import React from "react";
-import { Box, Typography } from "@mui/material";
+import { Box, Typography, styled } from "@mui/material";
 
 /**
- * Updated Footer:
- * - Navy background (#0b1c44)
- * - Champagne text (#e5d2b3)
+ * Replaces the prior navy background with a neumorphic black background and shadows.
  */
+const NeumorphicFooter = styled(Box)(() => ({
+  position: "relative",
+  background: "#000000",
+  boxShadow: "inset 8px 8px 16px #0a0a0a, inset -8px -8px 16px #1a1a1a, 0 0 5px rgba(255,255,255,0.2)",
+  borderRadius: "20px 20px 0 0",
+  padding: "16px",
+  textAlign: "center"
+}));
 
 export default function Footer() {
   return (
-    <Box
-      component="footer"
-      sx={{
-        backgroundColor: "#0b1c44",
-        color: "#e5d2b3",
-        padding: 2,
-        textAlign: "center",
-        marginTop: "auto",
-        boxShadow: "0 -2px 6px rgba(0,0,0,0.7)"
-      }}
-    >
-      <Typography variant="body2" sx={{ fontFamily: "serif", opacity: 0.9 }}>
+    <NeumorphicFooter component="footer">
+      <Typography
+        variant="body2"
+        sx={{
+          fontFamily: "serif",
+          color: "#fad6a5",
+          opacity: 0.9,
+          fontSize: "0.9rem"
+        }}
+      >
         © {new Date().getFullYear()} Wish Granted Kitchens and Baths. All rights reserved.
       </Typography>
-    </Box>
+    </NeumorphicFooter>
   );
 }

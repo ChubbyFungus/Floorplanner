@@ -4,8 +4,8 @@ import {
   Box,
   Typography,
   TextField,
-  Paper,
-  Divider
+  Divider,
+  styled
 } from "@mui/material";
 import { RootState } from "../../store/store";
 import { WallData, RoomData } from "../../types";
@@ -15,6 +15,21 @@ import {
   getDistance,
   pixelsToFeetAndInches
 } from "../../utils/geometryUtils";
+
+/**
+ * Neumorphic wrapper for the panel.
+ */
+const NeumorphicPanel = styled(Box)(() => ({
+  width: "100%",
+  height: "100%",
+  display: "flex",
+  flexDirection: "column",
+  background: "#000000",
+  boxShadow: "inset 8px 8px 16px #0a0a0a, inset -8px -8px 16px #1a1a1a, 0 0 5px rgba(255,255,255,0.2)",
+  borderRadius: "20px",
+  overflowY: "auto",
+  padding: "16px"
+}));
 
 const PANEL_WIDTH = 280;
 
@@ -93,150 +108,107 @@ const PropertiesPanel: React.FC = () => {
   };
 
   return (
-    <Box
-      sx={{
-        width: PANEL_WIDTH,
-        height: "100%",
-        display: "flex",
-        flexDirection: "column"
-      }}
-    >
-      <Paper
-        sx={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          backgroundColor: "#171717",
-          color: "#d4af37",
-          overflowY: "auto"
-        }}
-        elevation={3}
-      >
-        <Box padding={2}>
+    <NeumorphicPanel>
+      <Box mb={3}>
+        <Typography variant="h6" gutterBottom sx={{ fontFamily: "serif", color: "#fad6a5" }}>
+          Your Floor Plan Summary
+        </Typography>
+        <Typography variant="body1" sx={{ color: "#fff" }}>
+          Total Area: {Math.round(dimensions.totalArea)} sq ft
+        </Typography>
+        <Typography variant="body1" sx={{ color: "#fff" }}>
+          Total Volume: {Math.round(dimensions.totalVolume)} cubic ft
+        </Typography>
+      </Box>
+      <Divider sx={{ mb: 2, borderColor: "#444" }} />
 
-          {/* 1) Add "Your Floor Plan Summary" here */}
-          <Box mb={3}>
-            <Typography variant="h6" gutterBottom sx={{ fontFamily: "serif" }}>
-              Your Floor Plan Summary
-            </Typography>
-            <Typography variant="body1">
-              Total Area: {Math.round(dimensions.totalArea)} sq ft
-            </Typography>
-            <Typography variant="body1">
-              Total Volume: {Math.round(dimensions.totalVolume)} cubic ft
-            </Typography>
+      {selectedWall && (
+        <Box mb={2}>
+          <Typography variant="subtitle1" sx={{ color: "#fad6a5", fontFamily: "serif" }}>
+            Selected Wall
+          </Typography>
+          <Typography variant="body2" sx={{ color: "#fff" }}>
+            Wall ID: {selectedWall.id}
+          </Typography>
+          <Typography variant="body2" sx={{ color: "#fff" }}>
+            Current Length: {pixelsToFeetAndInches(getDistance(selectedWall.start, selectedWall.end))}
+          </Typography>
+          <Box mt={1} mb={1}>
+            <TextField
+              label="Set Length (e.g. 8'-6)"
+              size="small"
+              value={wallLengthInput}
+              onChange={handleWallLengthChange}
+              onBlur={handleWallLengthBlur}
+              sx={{
+                mr: 1,
+                "& .MuiOutlinedInput-root": {
+                  "& fieldset": { borderColor: "#d4af37" }
+                },
+                "& .MuiInputLabel-root": { color: "#d4af37" },
+                "& .MuiOutlinedInput-input": { color: "#fff" }
+              }}
+            />
           </Box>
 
-          <Divider sx={{ mb: 2, borderColor: "#444" }} />
-
-          {/* 2) Show details for selected wall or room */}
-          {selectedWall && (
-            <Box mb={2}>
-              <Typography variant="subtitle1" sx={{ color: "#fff", fontFamily: "serif" }}>
-                Selected Wall
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#fff" }}>
-                Wall ID: {selectedWall.id}
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#fff" }}>
-                Current Length: {pixelsToFeetAndInches(getDistance(selectedWall.start, selectedWall.end))}
-              </Typography>
-              <Box mt={1} mb={1}>
-                <TextField
-                  label="Set Length (e.g. 8'-6)"
-                  size="small"
-                  value={wallLengthInput}
-                  onChange={handleWallLengthChange}
-                  onBlur={handleWallLengthBlur}
-                  sx={{
-                    mr: 1,
-                    "& .MuiOutlinedInput-root": {
-                      "& fieldset": {
-                        borderColor: "#d4af37"
-                      }
-                    },
-                    "& .MuiInputLabel-root": {
-                      color: "#d4af37"
-                    },
-                    "& .MuiOutlinedInput-input": {
-                      color: "#fff"
-                    }
-                  }}
-                />
-              </Box>
-
-              <Typography variant="body2" sx={{ color: "#fff" }}>
-                Current Height: {(selectedWall.height / 25).toFixed(1)} ft
-              </Typography>
-              <Box mt={1} mb={1}>
-                <TextField
-                  label="Set Height (feet)"
-                  size="small"
-                  value={wallHeightInput}
-                  onChange={handleWallHeightChange}
-                  onBlur={handleWallHeightBlur}
-                  sx={{
-                    mr: 1,
-                    "& .MuiOutlinedInput-root": {
-                      "& fieldset": {
-                        borderColor: "#d4af37"
-                      }
-                    },
-                    "& .MuiInputLabel-root": {
-                      color: "#d4af37"
-                    },
-                    "& .MuiOutlinedInput-input": {
-                      color: "#fff"
-                    }
-                  }}
-                />
-              </Box>
-            </Box>
-          )}
-
-          {selectedRoom && (
-            <Box mb={2}>
-              <Typography variant="subtitle1" sx={{ color: "#fff", fontFamily: "serif" }}>
-                Selected Room
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#fff" }}>
-                Room ID: {selectedRoom.id}
-              </Typography>
-              <TextField
-                label="Room Name"
-                size="small"
-                value={selectedRoom.name}
-                onChange={handleRoomNameChange}
-                fullWidth
-                sx={{
-                  mb: 1,
-                  "& .MuiOutlinedInput-root": {
-                    "& fieldset": {
-                      borderColor: "#d4af37"
-                    }
-                  },
-                  "& .MuiInputLabel-root": {
-                    color: "#d4af37"
-                  },
-                  "& .MuiOutlinedInput-input": {
-                    color: "#fff"
-                  }
-                }}
-              />
-              <Typography variant="body2" sx={{ color: "#fff" }} gutterBottom>
-                Area: {Math.round(selectedRoom.area)} px²
-              </Typography>
-            </Box>
-          )}
-
-          {!selectedWall && !selectedRoom && (
-            <Typography variant="body2" sx={{ color: "#fff" }}>
-              No wall or room selected.
-            </Typography>
-          )}
+          <Typography variant="body2" sx={{ color: "#fff" }}>
+            Current Height: {(selectedWall.height / 25).toFixed(1)} ft
+          </Typography>
+          <Box mt={1} mb={1}>
+            <TextField
+              label="Set Height (feet)"
+              size="small"
+              value={wallHeightInput}
+              onChange={handleWallHeightChange}
+              onBlur={handleWallHeightBlur}
+              sx={{
+                mr: 1,
+                "& .MuiOutlinedInput-root": {
+                  "& fieldset": { borderColor: "#d4af37" }
+                },
+                "& .MuiInputLabel-root": { color: "#d4af37" },
+                "& .MuiOutlinedInput-input": { color: "#fff" }
+              }}
+            />
+          </Box>
         </Box>
-      </Paper>
-    </Box>
+      )}
+
+      {selectedRoom && (
+        <Box mb={2}>
+          <Typography variant="subtitle1" sx={{ color: "#fad6a5", fontFamily: "serif" }}>
+            Selected Room
+          </Typography>
+          <Typography variant="body2" sx={{ color: "#fff" }}>
+            Room ID: {selectedRoom.id}
+          </Typography>
+          <TextField
+            label="Room Name"
+            size="small"
+            value={selectedRoom.name}
+            onChange={handleRoomNameChange}
+            fullWidth
+            sx={{
+              mb: 1,
+              "& .MuiOutlinedInput-root": {
+                "& fieldset": { borderColor: "#d4af37" }
+              },
+              "& .MuiInputLabel-root": { color: "#d4af37" },
+              "& .MuiOutlinedInput-input": { color: "#fff" }
+            }}
+          />
+          <Typography variant="body2" sx={{ color: "#fff" }} gutterBottom>
+            Area: {Math.round(selectedRoom.area)} px²
+          </Typography>
+        </Box>
+      )}
+
+      {!selectedWall && !selectedRoom && (
+        <Typography variant="body2" sx={{ color: "#fff" }}>
+          No wall or room selected.
+        </Typography>
+      )}
+    </NeumorphicPanel>
   );
 };
 

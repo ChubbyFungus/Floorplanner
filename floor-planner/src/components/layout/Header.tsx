@@ -1,44 +1,57 @@
 import React from "react";
-import { AppBar, Toolbar, Typography, Box, Button, IconButton } from "@mui/material";
-import { Link } from "react-router-dom";
+import { AppBar, Toolbar, Typography, Box, IconButton } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
+import { styled } from "@mui/system";
 
 /**
- * Updated Header:
- * - Navy background
- * - Champagne accent color
+ * Neumorphic container styling for the entire header bar.
+ * We replicate the style from the toolbar:
+ *   - dark background (#000)
+ *   - inset shadows
+ *   - slight gradient
  */
+const NeumorphicHeaderBar = styled(AppBar)(() => ({
+  background: "#000000",
+  boxShadow: "inset 8px 8px 16px #0a0a0a, inset -8px -8px 16px #1a1a1a, 0 0 5px rgba(255,255,255,0.2)",
+  borderRadius: "0 0 20px 20px",
+  position: "relative"
+}));
+
+const NeumorphicToolbar = styled(Toolbar)(() => ({
+  minHeight: 56,
+  display: "flex",
+  justifyContent: "space-between",
+  padding: "0 16px"
+}));
+
+const BrandBox = styled(Box)(() => ({
+  display: "flex",
+  alignItems: "center"
+}));
+
+const BrandText = styled(Typography)(() => ({
+  fontFamily: "serif",
+  fontWeight: "bold",
+  fontSize: "1.2rem",
+  color: "#fad6a5",
+  marginLeft: "8px"
+}));
 
 export default function Header() {
   return (
-    <AppBar
-      position="static"
-      sx={{
-        backgroundColor: "#0b1c44",
-        boxShadow: "0 4px 8px rgba(0,0,0,0.8)",
-        borderBottom: "1px solid #2a345a"
-      }}
-    >
-      <Toolbar
-        sx={{
-          minHeight: 56,
-          display: "flex",
-          justifyContent: "space-between",
-          px: 2
-        }}
-      >
+    <NeumorphicHeaderBar position="static">
+      <NeumorphicToolbar>
         {/* Left Section / Brand & Optional Menu */}
-        <Box display="flex" alignItems="center">
+        <BrandBox>
           <IconButton
             size="small"
             edge="start"
             aria-label="menu"
             sx={{
-              mr: 1,
-              color: "#e5d2b3",
+              color: "#fad6a5",
               transition: "transform 0.2s",
               "&:hover": {
-                color: "#fff",
+                color: "#3b82f6",
                 backgroundColor: "transparent",
                 transform: "scale(1.05)"
               }
@@ -46,83 +59,55 @@ export default function Header() {
           >
             <MenuIcon fontSize="small" />
           </IconButton>
-          <Typography
-            variant="h6"
-            sx={{
-              fontFamily: "serif",
-              fontWeight: "bold",
-              color: "#e5d2b3",
-              fontSize: "1.2rem"
-            }}
-          >
-            Wish Granted Kitchens
-          </Typography>
-        </Box>
+          <BrandText>Wish Granted Kitchens</BrandText>
+        </BrandBox>
 
-        {/* Right Section / Navigation */}
+        {/* Right Section / Demo Buttons */}
         <Box display="flex" alignItems="center" gap={3}>
-          <Button
-            component={Link}
-            to="/floor-planner"
-            disableRipple
-            disableElevation
-            variant="text"
+          <Typography
+            variant="body2"
+            component="a"
+            href="#"
             sx={{
-              color: "#e5d2b3",
-              textTransform: "none",
+              color: "#fad6a5",
+              textDecoration: "none",
               fontFamily: "serif",
-              fontSize: "0.95rem",
-              p: 0,
-              "&:hover": {
-                backgroundColor: "transparent",
-                color: "#fff"
-              }
+              transition: "color 0.2s",
+              "&:hover": { color: "#3b82f6" }
             }}
           >
             Get Estimate
-          </Button>
-          <Button
-            component={Link}
-            to="#"
-            disableRipple
-            disableElevation
-            variant="text"
+          </Typography>
+          <Typography
+            variant="body2"
+            component="a"
+            href="#"
             sx={{
-              color: "#e5d2b3",
-              textTransform: "none",
+              color: "#fad6a5",
+              textDecoration: "none",
               fontFamily: "serif",
-              fontSize: "0.95rem",
-              p: 0,
-              "&:hover": {
-                backgroundColor: "transparent",
-                color: "#fff"
-              }
+              transition: "color 0.2s",
+              "&:hover": { color: "#3b82f6" }
             }}
           >
             About
-          </Button>
-          <Button
-            component={Link}
-            to="#"
-            disableRipple
-            disableElevation
-            variant="text"
+          </Typography>
+          <Typography
+            variant="body2"
+            component="a"
+            href="#"
             sx={{
-              color: "#e5d2b3",
-              textTransform: "none",
+              color: "#fad6a5",
+              textDecoration: "none",
               fontFamily: "serif",
-              fontSize: "0.95rem",
-              p: 0,
-              "&:hover": {
-                backgroundColor: "transparent",
-                color: "#fff"
-              }
+              transition: "color 0.2s",
+              "&:hover": { color: "#3b82f6" }
             }}
           >
             Contact
-          </Button>
+          </Typography>
         </Box>
-      </Toolbar>
-    </AppBar>
+      </NeumorphicToolbar>
+    </NeumorphicHeaderBar>
   );
 }

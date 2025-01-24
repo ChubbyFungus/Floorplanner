@@ -270,3 +270,40 @@ export function updateRoomArea(walls: WallData[]): number {
     // 4) Convert to sq ft
     return totalSqInches / 144;
 }
+
+// New geometry functions for wall calculations
+export function calculateWallIntersection(wall1: WallData, wall2: WallData): Point2D | null {
+    const [x1, y1] = [wall1.start.x, wall1.start.y];
+    const [x2, y2] = [wall1.end.x, wall1.end.y];
+    const [x3, y3] = [wall2.start.x, wall2.start.y];
+    const [x4, y4] = [wall2.end.x, wall2.end.y];
+
+    const denominator = (y4 - y3)*(x2 - x1) - (x4 - x3)*(y2 - y1);
+    if (denominator === 0) return null;
+
+    const ua = ((x4 - x3)*(y1 - y3) - (y4 - y3)*(x1 - x3)) / denominator;
+    const ub = ((x2 - x1)*(y1 - y3) - (y2 - y1)*(x1 - x3)) / denominator;
+
+    if (ua < 0 || ua > 1 || ub < 0 || ub > 1) return null;
+
+    return {
+        x: x1 + ua*(x2 - x1),
+        y: y1 + ua*(y2 - y1)
+    };
+}
+
+export function getWallLength(wall: WallData): number {
+    return Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+}
+
+export function calculateWallAngle(wall1: WallData, wall2: WallData): number {
+    const vec1 = [wall1.end.x - wall1.start.x, wall1.end.y - wall1.start.y];
+    const vec2 = [wall2.end.x - wall2.start.x, wall2.end.y - wall2.start.y];
+    
+    const dot = vec1[0]*vec2[0] + vec1[1]*vec2[1];
+    const mag1 = Math.hypot(vec1[0], vec1[1]);
+    const mag2 = Math.hypot(vec2[0], vec2[1]);
+    
+    if (mag1 === 0 || mag2 === 0) return 0;
+    return (Math.acos(dot / (mag1 * mag2)) * 180) / Math.PI;
+}

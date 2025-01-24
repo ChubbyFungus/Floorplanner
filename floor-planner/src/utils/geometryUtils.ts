@@ -1,11 +1,27 @@
-import { Point2D, WallData, FixtureData, RoomData } from "../types";
+import { FixtureData, RoomData } from "../types";
+/// <reference types="earcut" />
+
+export interface Point2D {
+    x: number;
+    y: number;
+}
+
+export type WallData = {
+    start: Point2D;
+    end: Point2D;
+    controlPoints?: Point2D[];
+    height?: number;
+};
 import earcut from "earcut";
 
 /**
  * Pixel-to-foot ratio for 2D drawing.
  */
+// Unit conversion constants
 export const PIXELS_PER_FOOT = 25;
 export const PIXELS_PER_INCH = PIXELS_PER_FOOT / 12;
+export const INCHES_TO_FEET = 1 / 12;
+export const SQUARE_INCHES_TO_SQUARE_FEET = 1 / 144;
 
 export const POINT_TOLERANCE = 30;
 export const LINE_SNAP_TOLERANCE = 20;
@@ -19,7 +35,8 @@ interface CalcResult {
  * computeArea
  * Takes an array of 2D points forming a polygon, uses earcut to find area in px².
  */
-function computeArea(points: Point2D[]): number {
+// Combined area calculation that handles both simple and complex polygons
+export function calculatePolygonArea(points: Point2D[]): number {
   if (points.length < 3) return 0;
 
   const flatCoords: number[] = [];
@@ -86,8 +103,33 @@ function isPointInPolygon(pt: Point2D, polygon: Point2D[]): boolean {
  * computeRoomArea
  * Direct polygon area via earcut.
  */
+// Flattens points to [x0,y0,x1,y1,...] format
+export function flattenPoints(points: Point2D[]): number[] {
+    return points.reduce<number[]>((acc, point) => {
+        acc.push(point.x, point.y);
+        return acc;
+    }, []);
+}
+
 function computeRoomArea(room: RoomData): number {
-  return computeArea(room.points);
+    return calculatePolygonArea(room.points);
+}
+
+// Enhanced unit conversion with dual input modes
+export function calculateRoomAreaInSquareFeet(
+    points: Point2D[], 
+    isInPixels: boolean = true
+): number {
+    const area = calculatePolygonArea(points);
+    
+    if (isInPixels) {
+        return (area / (PIXELS_PER_FOOT * PIXELS_PER_FOOT)) * SQUARE_INCHES_TO_SQUARE_FEET;
+    }
+    return area * SQUARE_INCHES_TO_SQUARE_FEET;
+}
+
+export function squareInchesToSquareFeet(squareInches: number): number {
+    return squareInches * SQUARE_INCHES_TO_SQUARE_FEET;
 }
 
 /**
@@ -179,7 +221,7 @@ export function calculateAreaAndVolume(
       totalAreaPx = 0;
     } else {
       const polygonPoints = walls.map((w) => w.start);
-      totalAreaPx = computeArea(polygonPoints);
+      totalAreaPx = calculatePolygonArea(polygonPoints);
     }
   }
 
@@ -189,7 +231,7 @@ export function calculateAreaAndVolume(
   let avgHeight = 0;
   if (walls.length > 0) {
     avgHeight =
-      walls.reduce((acc, w) => acc + w.height, 0) / walls.length;
+      walls.reduce((acc, w) => acc + (w.height || 96 /* 8ft default */), 0) / walls.length;
   }
   const totalVolume = totalAreaSqFt * (avgHeight / PIXELS_PER_FOOT);
 

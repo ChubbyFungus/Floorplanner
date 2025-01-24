@@ -1,19 +1,20 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
+export type SelectedTool = "select" | "wall" | "room" | "door" | "window" | null;
+
 export interface UiState {
   showGrid: boolean;
   snapToGrid: boolean;
   snapGridSize: number;
-  angleSnapEnabled: boolean; // still used internally
+  angleSnapEnabled: boolean;
   angleSnapIncrement: number;
   showRoomLabels: boolean;
   showTooltips: boolean;
-
-  selectedTool: "wall" | "room" | "select" | null;
+  selectedTool: SelectedTool;
   errorMessage: string | null;
   showMeasurements: boolean;
-
-  // New fields
+  snapToWalls: boolean;
+  snapToFixtures: boolean;
   tapeMeasureActive: boolean;
   aiTipsOpen: boolean;
 }
@@ -29,7 +30,8 @@ const initialState: UiState = {
   selectedTool: "select",
   errorMessage: null,
   showMeasurements: false,
-
+  snapToWalls: true,
+  snapToFixtures: false,
   tapeMeasureActive: false,
   aiTipsOpen: false
 };
@@ -44,10 +46,7 @@ export const uiSlice = createSlice({
     toggleSnapToGrid: (state) => {
       state.snapToGrid = !state.snapToGrid;
     },
-    setSelectedTool: (
-      state,
-      action: PayloadAction<"wall" | "room" | "select" | null>
-    ) => {
+    setSelectedTool: (state, action: PayloadAction<SelectedTool>) => {
       state.selectedTool = action.payload;
     },
     setErrorMessage: (state, action: PayloadAction<string | null>) => {
@@ -68,12 +67,17 @@ export const uiSlice = createSlice({
     setShowTooltips: (state, action: PayloadAction<boolean>) => {
       state.showTooltips = action.payload;
     },
-    // New toggles
     toggleTapeMeasure: (state) => {
       state.tapeMeasureActive = !state.tapeMeasureActive;
     },
     toggleAiTips: (state) => {
       state.aiTipsOpen = !state.aiTipsOpen;
+    },
+    toggleSnapToWalls: (state) => {
+      state.snapToWalls = !state.snapToWalls;
+    },
+    toggleSnapToFixtures: (state) => {
+      state.snapToFixtures = !state.snapToFixtures;
     }
   }
 });
@@ -89,7 +93,9 @@ export const {
   setShowRoomLabels,
   setShowTooltips,
   toggleTapeMeasure,
-  toggleAiTips
+  toggleAiTips,
+  toggleSnapToWalls,
+  toggleSnapToFixtures
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

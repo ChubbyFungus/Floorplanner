@@ -40,12 +40,13 @@ import { setSelectedTool } from "../../store/slices/uiSlice";
 import { selectRoom, detectRooms } from "../../store/slices/roomSlice";
 import { isPointInRoom } from "../../utils/roomDetection";
 import WallContextMenu from "./WallContextMenu";
-import { TapeMeasureTool } from "./TapeMeasureTool";
 
 /**
  * FloorPlanner2D
  * -------------
- * Enhanced wall selection, refined angle snapping, and better room selection detection.
+ * - No longer reverts to 'select' after finishing a room.
+ * - Adds corner dragging: if two walls share a corner, user can move that corner to resize them.
+ * - Respects the showMeasurements toggle in the UI.
  */
 
 interface EndPointHit {
@@ -53,30 +54,21 @@ interface EndPointHit {
   isStart: boolean;
 }
 
-interface FloorPlanner2DProps {
-  onWallSelect?: (wall: WallData) => void;
-  onRoomSelect?: (room: RoomData) => void;
-  showMeasurements?: boolean;
-  angleSnapEnabled?: boolean;
-  showGrid?: boolean;
-}
-
 const WALL_THRESHOLD = 8;
 const ENDPOINT_THRESHOLD = 10;
+const CORNER_THRESHOLD = 10;
 
-const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
-  onWallSelect,
-  onRoomSelect,
-  showMeasurements = false,
-  angleSnapEnabled = true,
-  showGrid = true
-}) => {
+const FloorPlanner2D: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dispatch = useDispatch<AppDispatch>();
 
   const uiState = useSelector((state: RootState) => state.ui);
-  const { snapToGrid: snapEnabled, snapGridSize, showMeasurements: uiShowMeasurements, tapeMeasureActive } = uiState;
-  const showMeasurementLabels = showMeasurements || uiShowMeasurements;
+  const {
+    snapToGrid: snapEnabled,
+    snapGridSize,
+    showMeasurements,
+    selectedTool
+  } = uiState;
 
   const floorPlan = useSelector((state: RootState) => state.floorPlanner.present);
   const { walls, wallInProgress, selectedWallId } = floorPlan;
@@ -84,9 +76,14 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
   const roomState = useSelector((state: RootState) => state.room);
   const { rooms } = roomState;
 
+  // We'll track room creation state
   const [roomClickStart, setRoomClickStart] = useState<Point2D | null>(null);
   const [roomPreviewEnd, setRoomPreviewEnd] = useState<Point2D | null>(null);
+
+  // Endpoint or corner dragging states
   const [draggingEndpoint, setDraggingEndpoint] = useState<EndPointHit | null>(null);
+  const [draggingCorner, setDraggingCorner] = useState<Point2D | null>(null);
+  const [cornerWalls, setCornerWalls] = useState<WallData[]>([]);
 
   // Right-click context menu
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -109,18 +106,38 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
       }
 
       if (draggingEndpoint) {
+        // If dragging the endpoint of a single wall
         const wall = walls.find((w) => w.id === draggingEndpoint.wallId);
         if (!wall) return;
 
         if (draggingEndpoint.isStart) {
-          dispatch(updateWallEnd({ ...wall, start: { x, y } }));
+          wall.start = { x, y };
         } else {
-          dispatch(updateWallEnd({ ...wall, end: { x, y } }));
+          wall.end = { x, y };
         }
+        dispatch(updateWallEnd({ ...wall }));
         return;
       }
 
-      if (wallInProgress && angleSnapEnabled) {
+      if (draggingCorner && cornerWalls.length > 0) {
+        // Move all walls sharing that corner
+        cornerWalls.forEach((w) => {
+          if (arePointsEqual(w.start, draggingCorner!)) {
+            w.start = { x, y };
+            dispatch(updateWallEnd({ ...w }));
+          }
+          if (arePointsEqual(w.end, draggingCorner!)) {
+            w.end = { x, y };
+            dispatch(updateWallEnd({ ...w }));
+          }
+        });
+        // Keep updating the dragging corner reference
+        setDraggingCorner({ x, y });
+        return;
+      }
+
+      if (wallInProgress && uiState.angleSnapEnabled) {
+        // angle snapping for in-progress wall
         const dx = x - wallInProgress.start.x;
         const dy = y - wallInProgress.start.y;
         const currentAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
@@ -131,9 +148,16 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
           x = wallInProgress.start.x + distance * Math.cos(angleRad);
           y = wallInProgress.start.y + distance * Math.sin(angleRad);
         }
+        dispatch(
+          updateWallEnd({
+            ...wallInProgress,
+            end: { x, y }
+          })
+        );
       }
 
-      if (wallInProgress) {
+      if (wallInProgress && !uiState.angleSnapEnabled) {
+        // normal in-progress
         dispatch(
           updateWallEnd({
             ...wallInProgress,
@@ -151,9 +175,11 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
       snapGridSize,
       draggingEndpoint,
       wallInProgress,
-      angleSnapEnabled,
+      uiState.angleSnapEnabled,
       walls,
       dispatch,
+      draggingCorner,
+      cornerWalls,
       roomClickStart
     ]
   );
@@ -164,6 +190,11 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
 
       if (draggingEndpoint) {
         setDraggingEndpoint(null);
+        return;
+      }
+      if (draggingCorner) {
+        setDraggingCorner(null);
+        setCornerWalls([]);
         return;
       }
 
@@ -179,8 +210,16 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
 
       const clickPoint: Point2D = { x, y };
 
+      // Check corner first
+      const cornerInfo = findCornerHit(clickPoint);
+      if (cornerInfo) {
+        setDraggingCorner(cornerInfo.corner);
+        setCornerWalls(cornerInfo.walls);
+        return;
+      }
+
       // Room tool
-      if (uiState.selectedTool === "room") {
+      if (selectedTool === "room") {
         if (!roomClickStart) {
           setRoomClickStart(clickPoint);
           setRoomPreviewEnd(clickPoint);
@@ -188,13 +227,13 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
           dispatch(createRectangularRoom({ start: roomClickStart, end: clickPoint }));
           setRoomClickStart(null);
           setRoomPreviewEnd(null);
-          dispatch(setSelectedTool("select"));
+          // no longer reverting to selection tool automatically
         }
         return;
       }
 
       // Wall tool
-      if (uiState.selectedTool === "wall") {
+      if (selectedTool === "wall") {
         if (!wallInProgress) {
           dispatch(
             startWall({
@@ -237,8 +276,10 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
         return;
       }
 
+      // If tool is 'door' or 'window', we'd handle that logic here (placeholder)...
+
       // Select tool
-      if (uiState.selectedTool === "select") {
+      if (selectedTool === "select" || selectedTool === "selection") {
         const endpoint = findEndpointHit(clickPoint);
         if (endpoint) {
           setDraggingEndpoint(endpoint);
@@ -249,7 +290,6 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
         const nearestWall = findWallHit(clickPoint);
         if (nearestWall && nearestWall.dist <= WALL_THRESHOLD) {
           dispatch(selectWall(nearestWall.wall.id));
-          onWallSelect?.(nearestWall.wall);
           return;
         }
 
@@ -257,7 +297,6 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
         for (const r of rooms) {
           if (isPointInRoom(clickPoint, r.points)) {
             dispatch(selectRoom(r.id));
-            onRoomSelect?.(r);
             return;
           }
         }
@@ -271,14 +310,13 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
       draggingEndpoint,
       snapEnabled,
       snapGridSize,
-      uiState.selectedTool,
+      selectedTool,
       wallInProgress,
       walls,
       roomClickStart,
       dispatch,
-      onWallSelect,
-      onRoomSelect,
-      rooms
+      rooms,
+      draggingCorner
     ]
   );
 
@@ -305,6 +343,7 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
     []
   );
 
+  // Helpers
   const findEndpointHit = (pt: Point2D): EndPointHit | null => {
     for (const w of walls) {
       const distStart = getDistance(pt, w.start);
@@ -334,14 +373,13 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
     return { wall: nearestWall, dist: nearestDistance };
   };
 
-  const distanceToSegment = (pt: Point2D, wall: WallData): number => {
-    // For straight walls only
-    // If curved is needed, approximate or handle differently
+  function distanceToSegment(pt: Point2D, wall: WallData): number {
+    // For straight walls only (curved not handled here)
     const { start, end } = wall;
     return pointSegmentDistance(pt, start, end);
-  };
+  }
 
-  const pointSegmentDistance = (p: Point2D, p1: Point2D, p2: Point2D) => {
+  function pointSegmentDistance(p: Point2D, p1: Point2D, p2: Point2D) {
     const A = p.x - p1.x;
     const B = p.y - p1.y;
     const C = p2.x - p1.x;
@@ -367,7 +405,40 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
     const dx = p.x - xx;
     const dy = p.y - yy;
     return Math.sqrt(dx * dx + dy * dy);
-  };
+  }
+
+  // For corner dragging
+  function arePointsEqual(p1: Point2D, p2: Point2D): boolean {
+    return Math.abs(p1.x - p2.x) < 0.001 && Math.abs(p1.y - p2.y) < 0.001;
+  }
+
+  function findCornerHit(pt: Point2D) {
+    // If the point is near a shared corner of exactly 2+ walls
+    // return that corner and the walls that share it
+    for (const w of walls) {
+      // check start
+      if (getDistance(pt, w.start) < CORNER_THRESHOLD) {
+        // find all walls sharing w.start
+        const sharedWalls = walls.filter(
+          (wall) =>
+            arePointsEqual(wall.start, w.start) || arePointsEqual(wall.end, w.start)
+        );
+        if (sharedWalls.length >= 2) {
+          return { corner: w.start, walls: sharedWalls };
+        }
+      }
+      // check end
+      if (getDistance(pt, w.end) < CORNER_THRESHOLD) {
+        const sharedWalls = walls.filter(
+          (wall) => arePointsEqual(wall.start, w.end) || arePointsEqual(wall.end, w.end)
+        );
+        if (sharedWalls.length >= 2) {
+          return { corner: w.end, walls: sharedWalls };
+        }
+      }
+    }
+    return null;
+  }
 
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -387,7 +458,7 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
       ctx.stroke();
       ctx.restore();
 
-      if (showMeasurementLabels) {
+      if (showMeasurements) {
         const dist = getDistance(wall.start, wall.end);
         const label = pixelsToFeetAndInches(dist);
         const midX = (wall.start.x + wall.end.x) / 2;
@@ -413,8 +484,8 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
     });
 
     // In-progress wall
-    if (uiState.selectedTool === "wall" && wallInProgress) {
-      const angleGuides = angleSnapEnabled
+    if (selectedTool === "wall" && wallInProgress) {
+      const angleGuides = uiState.angleSnapEnabled
         ? generateAngleGuides(
             wallInProgress.start,
             wallInProgress.end,
@@ -427,11 +498,11 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
             walls
           )
         : undefined;
-      drawInProgressWall(ctx, wallInProgress, showMeasurementLabels, angleGuides);
+      drawInProgressWall(ctx, wallInProgress, showMeasurements, angleGuides);
     }
 
     // Room preview
-    if (uiState.selectedTool === "room" && roomClickStart && roomPreviewEnd) {
+    if (selectedTool === "room" && roomClickStart && roomPreviewEnd) {
       const startX = roomClickStart.x;
       const startY = roomClickStart.y;
       const endX = roomPreviewEnd.x;
@@ -453,11 +524,11 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
   }, [
     walls,
     wallInProgress,
-    uiState.selectedTool,
+    selectedTool,
     roomClickStart,
     roomPreviewEnd,
-    showMeasurementLabels,
-    angleSnapEnabled,
+    showMeasurements,
+    uiState.angleSnapEnabled,
     selectedWallId
   ]);
 
@@ -494,15 +565,13 @@ const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
           width: "100%",
           height: "100%",
           zIndex: 2,
-          /* Set background to grey: */
           backgroundColor: "#ccc"
         }}
         onMouseMove={handleMouseMove}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
       />
-      {showGrid && <Grid width={0} height={0} />}
-      {tapeMeasureActive && <TapeMeasureTool canvasRef={canvasRef} />}
+      {uiState.showGrid && <Grid width={0} height={0} />}
       {contextMenuOpen && (
         <WallContextMenu
           open={contextMenuOpen}
