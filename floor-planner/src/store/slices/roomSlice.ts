@@ -5,12 +5,13 @@ import { findRooms } from "../../utils/roomDetection";
 interface RoomState {
   rooms: RoomData[];
   selectedRoomId: string | null;
-  // We rely on uiSlice for the global showRoomLabels, but might local-override if needed
+  isEditing: boolean;
 }
 
 const initialState: RoomState = {
   rooms: [],
-  selectedRoomId: null
+  selectedRoomId: null,
+  isEditing: false
 };
 
 export const roomSlice = createSlice({
@@ -23,10 +24,19 @@ export const roomSlice = createSlice({
     selectRoom: (state, action: PayloadAction<string | null>) => {
       state.selectedRoomId = action.payload;
     },
+    deselectRoom: (state, _action: PayloadAction<{}>) => {
+      state.selectedRoomId = null;
+    },
     updateRoom: (state, action: PayloadAction<RoomData>) => {
       const index = state.rooms.findIndex(r => r.id === action.payload.id);
       if (index !== -1) {
         state.rooms[index] = action.payload;
+      }
+    },
+    deleteRoom: (state, action: PayloadAction<string>) => {
+      state.rooms = state.rooms.filter(r => r.id !== action.payload);
+      if (state.selectedRoomId === action.payload) {
+        state.selectedRoomId = null;
       }
     },
     setRoomName: (state, action: PayloadAction<{ id: string; name: string }>) => {
@@ -34,9 +44,25 @@ export const roomSlice = createSlice({
       if (room) {
         room.name = action.payload.name;
       }
+    },
+    startRoomEditing: (state, _action: PayloadAction<{}>) => {
+      state.isEditing = true;
+    },
+    finishRoomEditing: (state, _action: PayloadAction<{}>) => {
+      state.isEditing = false;
     }
   }
 });
 
-export const { detectRooms, selectRoom, updateRoom, setRoomName } = roomSlice.actions;
+export const {
+  detectRooms,
+  selectRoom,
+  deselectRoom,
+  updateRoom,
+  deleteRoom,
+  setRoomName,
+  startRoomEditing,
+  finishRoomEditing
+} = roomSlice.actions;
+
 export default roomSlice.reducer;

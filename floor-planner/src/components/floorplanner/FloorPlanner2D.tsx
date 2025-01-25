@@ -5,595 +5,368 @@ import React, {
   useState
 } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { debugLogger } from "../../utils/debugLogger";
 import { RootState, AppDispatch } from "../../store/store";
+import {
+  snapToGrid,
+  getDistance,
+  pixelsToFeetAndInches,
+  PIXELS_PER_INCH,
+  isPointInPolygon,
+  arePointsEqual,
+  snapToWall
+} from "../../utils/geometryUtils";
+import {
+  generateAngleGuides,
+  findNearestSnapAngle
+} from "../../utils/angleUtils";
+import { createStraightWall } from "../../utils/wallUtils";
+import { WallData, Point2D } from "../../types";
 import {
   startWall,
   updateWallEnd,
   finishWall,
   selectWall,
   deselectWall,
-  addWall
+  deleteWall,
+  startWallEditing,
+  addWall,
+  updateWall,
+  cancelWall
 } from "../../store/slices/floorPlannerSlice";
-import {
-  createRectangularRoom,
-  cancelRoom
-} from "../../store/slices/roomToolSlice";
-import {
-  snapToGrid,
-  getDistance,
-  pixelsToFeetAndInches
-} from "../../utils/geometryUtils";
-import {
-  drawInProgressWall
-} from "./drawing";
-import {
-  WallData,
-  Point2D,
-  RoomData
-} from "../../types";
-import {
-  generateAngleGuides,
-  findNearestSnapAngle
-} from "../../utils/angleUtils";
+import ContextMenu from "./ContextMenu";
 import Grid from "./Grid";
-import { setSelectedTool } from "../../store/slices/uiSlice";
-import { selectRoom, detectRooms } from "../../store/slices/roomSlice";
-import { isPointInRoom } from "../../utils/roomDetection";
-import WallContextMenu from "./WallContextMenu";
 
-/**
- * FloorPlanner2D
- * -------------
- * - No longer reverts to 'select' after finishing a room.
- * - Adds corner dragging: if two walls share a corner, user can move that corner to resize them.
- * - Respects the showMeasurements toggle in the UI.
- */
+// Constants
+const WALL_THRESHOLD = 10; // Distance in pixels for wall selection
 
-interface EndPointHit {
-  wallId: string;
-  isStart: boolean;
+interface FloorPlanner2DProps {
+  selectedTool: string;
+  snapEnabled: boolean;
+  showGrid: boolean;
 }
 
-const WALL_THRESHOLD = 8;
-const ENDPOINT_THRESHOLD = 10;
-const CORNER_THRESHOLD = 10;
+// Helper function to create a wall
+const createWall = (start: Point2D, end: Point2D): WallData => {
+  return createStraightWall(start, end);
+};
 
-const FloorPlanner2D: React.FC = () => {
+const FloorPlanner2D: React.FC<FloorPlanner2DProps> = ({
+  selectedTool,
+  snapEnabled,
+  showGrid
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dispatch = useDispatch<AppDispatch>();
+  const [contextMenuPosition, setContextMenuPosition] = useState<Point2D | null>(null);
+  const [clickPoint, setClickPoint] = useState<Point2D | null>(null);
 
   const uiState = useSelector((state: RootState) => state.ui);
   const {
-    snapToGrid: snapEnabled,
     snapGridSize,
     showMeasurements,
-    selectedTool
+    angleSnapEnabled,
+    selectedTool: uiSelectedTool,
+    snapToGrid: shouldSnapToGrid
   } = uiState;
 
-  const floorPlan = useSelector((state: RootState) => state.floorPlanner.present);
-  const { walls, wallInProgress, selectedWallId } = floorPlan;
+  // Use the tool from props or UI state
+  const activeTool = selectedTool || uiSelectedTool;
 
-  const roomState = useSelector((state: RootState) => state.room);
-  const { rooms } = roomState;
+  // Access the present state directly from the selector
+  const walls = useSelector((state: RootState) => state.floorPlanner.present.walls);
+  const selectedWallId = useSelector((state: RootState) => state.floorPlanner.present.selectedWallId);
+  const wallInProgress = useSelector((state: RootState) => state.floorPlanner.present.wallInProgress);
 
-  // We'll track room creation state
-  const [roomClickStart, setRoomClickStart] = useState<Point2D | null>(null);
-  const [roomPreviewEnd, setRoomPreviewEnd] = useState<Point2D | null>(null);
+  // Handle mouse move for wall preview
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
 
-  // Endpoint or corner dragging states
-  const [draggingEndpoint, setDraggingEndpoint] = useState<EndPointHit | null>(null);
-  const [draggingCorner, setDraggingCorner] = useState<Point2D | null>(null);
-  const [cornerWalls, setCornerWalls] = useState<WallData[]>([]);
+    // Snap to grid if enabled
+    if (shouldSnapToGrid) {
+      const snapped = snapToGrid({ x, y }, snapGridSize);
+      x = snapped.x;
+      y = snapped.y;
+    }
 
-  // Right-click context menu
-  const [contextMenuOpen, setContextMenuOpen] = useState(false);
-  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
-  const [contextMenuWall, setContextMenuWall] = useState<WallData | null>(null);
-  const [contextClickPoint, setContextClickPoint] = useState<Point2D | null>(null);
-
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!canvasRef.current) return;
-      const rect = canvasRef.current.getBoundingClientRect();
-
-      let x = e.clientX - rect.left;
-      let y = e.clientY - rect.top;
-
-      if (snapEnabled) {
-        const snapped = snapToGrid({ x, y }, snapGridSize);
-        x = snapped.x;
-        y = snapped.y;
-      }
-
-      if (draggingEndpoint) {
-        // If dragging the endpoint of a single wall
-        const wall = walls.find((w) => w.id === draggingEndpoint.wallId);
-        if (!wall) return;
-
-        if (draggingEndpoint.isStart) {
-          wall.start = { x, y };
-        } else {
-          wall.end = { x, y };
-        }
-        dispatch(updateWallEnd({ ...wall }));
-        return;
-      }
-
-      if (draggingCorner && cornerWalls.length > 0) {
-        // Move all walls sharing that corner
-        cornerWalls.forEach((w) => {
-          if (arePointsEqual(w.start, draggingCorner!)) {
-            w.start = { x, y };
-            dispatch(updateWallEnd({ ...w }));
-          }
-          if (arePointsEqual(w.end, draggingCorner!)) {
-            w.end = { x, y };
-            dispatch(updateWallEnd({ ...w }));
-          }
-        });
-        // Keep updating the dragging corner reference
-        setDraggingCorner({ x, y });
-        return;
-      }
-
-      if (wallInProgress && uiState.angleSnapEnabled) {
-        // angle snapping for in-progress wall
+    // If user is drawing a wall, make the endpoint follow cursor
+    if (activeTool === "wall" && wallInProgress) {
+      if (angleSnapEnabled) {
+        // The angle from start->(x,y):
         const dx = x - wallInProgress.start.x;
         const dy = y - wallInProgress.start.y;
-        const currentAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
-        const nearest = findNearestSnapAngle(currentAngle, walls);
-        if (nearest) {
-          const distance = getDistance(wallInProgress.start, { x, y });
-          const angleRad = (nearest.angle * Math.PI) / 180;
-          x = wallInProgress.start.x + distance * Math.cos(angleRad);
-          y = wallInProgress.start.y + distance * Math.sin(angleRad);
-        }
-        dispatch(
-          updateWallEnd({
-            ...wallInProgress,
-            end: { x, y }
-          })
-        );
+        const angle = Math.atan2(dy, dx);
+        const snappedAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        x = wallInProgress.start.x + dist * Math.cos(snappedAngle);
+        y = wallInProgress.start.y + dist * Math.sin(snappedAngle);
       }
 
-      if (wallInProgress && !uiState.angleSnapEnabled) {
-        // normal in-progress
-        dispatch(
-          updateWallEnd({
-            ...wallInProgress,
-            end: { x, y }
-          })
-        );
-      }
-
-      if (roomClickStart) {
-        setRoomPreviewEnd({ x, y });
-      }
-    },
-    [
-      snapEnabled,
-      snapGridSize,
-      draggingEndpoint,
-      wallInProgress,
-      uiState.angleSnapEnabled,
-      walls,
-      dispatch,
-      draggingCorner,
-      cornerWalls,
-      roomClickStart
-    ]
-  );
-
-  const handleClick = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!canvasRef.current) return;
-
-      if (draggingEndpoint) {
-        setDraggingEndpoint(null);
-        return;
-      }
-      if (draggingCorner) {
-        setDraggingCorner(null);
-        setCornerWalls([]);
-        return;
-      }
-
-      const rect = canvasRef.current.getBoundingClientRect();
-      let x = e.clientX - rect.left;
-      let y = e.clientY - rect.top;
-
-      if (snapEnabled) {
-        const snapped = snapToGrid({ x, y }, snapGridSize);
-        x = snapped.x;
-        y = snapped.y;
-      }
-
-      const clickPoint: Point2D = { x, y };
-
-      // Check corner first
-      const cornerInfo = findCornerHit(clickPoint);
-      if (cornerInfo) {
-        setDraggingCorner(cornerInfo.corner);
-        setCornerWalls(cornerInfo.walls);
-        return;
-      }
-
-      // Room tool
-      if (selectedTool === "room") {
-        if (!roomClickStart) {
-          setRoomClickStart(clickPoint);
-          setRoomPreviewEnd(clickPoint);
-        } else {
-          dispatch(createRectangularRoom({ start: roomClickStart, end: clickPoint }));
-          setRoomClickStart(null);
-          setRoomPreviewEnd(null);
-          // no longer reverting to selection tool automatically
-        }
-        return;
-      }
-
-      // Wall tool
-      if (selectedTool === "wall") {
-        if (!wallInProgress) {
-          dispatch(
-            startWall({
-              id: "temp-wall",
-              type: "straight",
-              start: { x, y },
-              end: { x, y },
-              thickness: 10,
-              height: 100
-            })
-          );
-        } else {
-          const distanceFromStart = getDistance(wallInProgress.start, clickPoint);
-          if (distanceFromStart < 10) {
-            dispatch(finishWall());
-            dispatch(detectRooms({ walls }));
-          } else {
-            dispatch(
-              updateWallEnd({
-                ...wallInProgress,
-                end: { x, y }
-              })
-            );
-            dispatch(finishWall());
-            dispatch(detectRooms({ walls }));
-
-            // Start new consecutive wall
-            dispatch(
-              startWall({
-                id: "temp-wall",
-                type: "straight",
-                start: { x, y },
-                end: { x, y },
-                thickness: 10,
-                height: 100
-              })
-            );
-          }
-        }
-        return;
-      }
-
-      // If tool is 'door' or 'window', we'd handle that logic here (placeholder)...
-
-      // Select tool
-      if (selectedTool === "select" || selectedTool === "selection") {
-        const endpoint = findEndpointHit(clickPoint);
-        if (endpoint) {
-          setDraggingEndpoint(endpoint);
-          dispatch(selectWall(endpoint.wallId));
-          return;
-        }
-
-        const nearestWall = findWallHit(clickPoint);
-        if (nearestWall && nearestWall.dist <= WALL_THRESHOLD) {
-          dispatch(selectWall(nearestWall.wall.id));
-          return;
-        }
-
-        // Check if clicked inside a room
-        for (const r of rooms) {
-          if (isPointInRoom(clickPoint, r.points)) {
-            dispatch(selectRoom(r.id));
-            return;
-          }
-        }
-
-        // If none matched, deselect
-        dispatch(deselectWall());
-        dispatch(selectRoom(null));
-      }
-    },
-    [
-      draggingEndpoint,
-      snapEnabled,
-      snapGridSize,
-      selectedTool,
-      wallInProgress,
-      walls,
-      roomClickStart,
-      dispatch,
-      rooms,
-      draggingCorner
-    ]
-  );
-
-  const handleContextMenu = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      e.preventDefault();
-      if (!canvasRef.current) return;
-      const rect = canvasRef.current.getBoundingClientRect();
-      let x = e.clientX - rect.left;
-      let y = e.clientY - rect.top;
-
-      const clickPt: Point2D = { x, y };
-
-      const nearest = findWallHit(clickPt);
-      if (nearest && nearest.dist <= WALL_THRESHOLD) {
-        setContextMenuPosition({ x: e.clientX, y: e.clientY });
-        setContextMenuWall(nearest.wall);
-        setContextClickPoint(clickPt);
-        setContextMenuOpen(true);
-      } else {
-        setContextMenuOpen(false);
-      }
-    },
-    []
-  );
-
-  // Helpers
-  const findEndpointHit = (pt: Point2D): EndPointHit | null => {
-    for (const w of walls) {
-      const distStart = getDistance(pt, w.start);
-      if (distStart <= ENDPOINT_THRESHOLD) {
-        return { wallId: w.id, isStart: true };
-      }
-      const distEnd = getDistance(pt, w.end);
-      if (distEnd <= ENDPOINT_THRESHOLD) {
-        return { wallId: w.id, isStart: false };
-      }
+      // Then update the wall end
+      dispatch(updateWallEnd({ ...wallInProgress, end: { x, y } }));
     }
-    return null;
-  };
+  }, [canvasRef, shouldSnapToGrid, snapGridSize, angleSnapEnabled, activeTool, wallInProgress, dispatch]);
 
-  const findWallHit = (pt: Point2D) => {
-    let nearestWall: WallData | null = null;
-    let nearestDistance = Infinity;
-
-    for (const wall of walls) {
-      const dist = distanceToSegment(pt, wall);
-      if (dist < nearestDistance) {
-        nearestDistance = dist;
-        nearestWall = wall;
-      }
-    }
-    if (!nearestWall) return null;
-    return { wall: nearestWall, dist: nearestDistance };
-  };
-
-  function distanceToSegment(pt: Point2D, wall: WallData): number {
-    // For straight walls only (curved not handled here)
-    const { start, end } = wall;
-    return pointSegmentDistance(pt, start, end);
-  }
-
-  function pointSegmentDistance(p: Point2D, p1: Point2D, p2: Point2D) {
-    const A = p.x - p1.x;
-    const B = p.y - p1.y;
-    const C = p2.x - p1.x;
-    const D = p2.y - p1.y;
-
-    const dot = A * C + B * D;
-    const lenSq = C * C + D * D;
-    let param = -1;
-    if (lenSq !== 0) param = dot / lenSq;
-
-    let xx, yy;
-    if (param < 0) {
-      xx = p1.x;
-      yy = p1.y;
-    } else if (param > 1) {
-      xx = p2.x;
-      yy = p2.y;
-    } else {
-      xx = p1.x + param * C;
-      yy = p1.y + param * D;
-    }
-
-    const dx = p.x - xx;
-    const dy = p.y - yy;
-    return Math.sqrt(dx * dx + dy * dy);
-  }
-
-  // For corner dragging
-  function arePointsEqual(p1: Point2D, p2: Point2D): boolean {
-    return Math.abs(p1.x - p2.x) < 0.001 && Math.abs(p1.y - p2.y) < 0.001;
-  }
-
-  function findCornerHit(pt: Point2D) {
-    // If the point is near a shared corner of exactly 2+ walls
-    // return that corner and the walls that share it
-    for (const w of walls) {
-      // check start
-      if (getDistance(pt, w.start) < CORNER_THRESHOLD) {
-        // find all walls sharing w.start
-        const sharedWalls = walls.filter(
-          (wall) =>
-            arePointsEqual(wall.start, w.start) || arePointsEqual(wall.end, w.start)
-        );
-        if (sharedWalls.length >= 2) {
-          return { corner: w.start, walls: sharedWalls };
-        }
-      }
-      // check end
-      if (getDistance(pt, w.end) < CORNER_THRESHOLD) {
-        const sharedWalls = walls.filter(
-          (wall) => arePointsEqual(wall.start, w.end) || arePointsEqual(wall.end, w.end)
-        );
-        if (sharedWalls.length >= 2) {
-          return { corner: w.end, walls: sharedWalls };
-        }
-      }
-    }
-    return null;
-  }
-
-  const redraw = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    walls.forEach((wall) => {
-      ctx.save();
-      ctx.strokeStyle = wall.id === selectedWallId ? "#ff0000" : "#333";
-      ctx.lineWidth = wall.thickness;
-      ctx.beginPath();
-      ctx.moveTo(wall.start.x, wall.start.y);
-      ctx.lineTo(wall.end.x, wall.end.y);
-      ctx.stroke();
-      ctx.restore();
-
-      if (showMeasurements) {
-        const dist = getDistance(wall.start, wall.end);
-        const label = pixelsToFeetAndInches(dist);
-        const midX = (wall.start.x + wall.end.x) / 2;
-        const midY = (wall.start.y + wall.end.y) / 2;
-        ctx.save();
-        ctx.fillStyle = "#000";
-        ctx.font = "12px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText(label, midX, midY - 10);
-        ctx.restore();
-      }
-
-      // Endpoints
-      ctx.save();
-      ctx.fillStyle = "#00f";
-      ctx.beginPath();
-      ctx.arc(wall.start.x, wall.start.y, 4, 0, 2 * Math.PI);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(wall.end.x, wall.end.y, 4, 0, 2 * Math.PI);
-      ctx.fill();
-      ctx.restore();
+  // Handle click for context menu
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    debugLogger("Click event", { 
+      tool: activeTool,
+      position: { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY },
+      clientPosition: { x: e.clientX, y: e.clientY },
+      wallInProgress: wallInProgress ? {
+        id: wallInProgress.id,
+        start: wallInProgress.start,
+        end: wallInProgress.end
+      } : null
     });
 
-    // In-progress wall
-    if (selectedTool === "wall" && wallInProgress) {
-      const angleGuides = uiState.angleSnapEnabled
-        ? generateAngleGuides(
-            wallInProgress.start,
-            wallInProgress.end,
-            (Math.atan2(
-              wallInProgress.end.y - wallInProgress.start.y,
-              wallInProgress.end.x - wallInProgress.start.x
-            ) *
-              180) /
-              Math.PI,
-            walls
-          )
-        : undefined;
-      drawInProgressWall(ctx, wallInProgress, showMeasurements, angleGuides);
+    const canvasPoint = {
+      x: e.nativeEvent.offsetX,
+      y: e.nativeEvent.offsetY
+    };
+
+    // Handle wall drawing
+    if (activeTool === "wall") {
+      debugLogger("Wall tool click", {
+        wallInProgress,
+        clickPoint: canvasPoint,
+        existingWalls: walls.length,
+        shouldSnapToGrid,
+        snapGridSize
+      });
+
+      // Get snapped point
+      let snappedPoint = shouldSnapToGrid ? snapToGrid(canvasPoint, snapGridSize) : canvasPoint;
+      
+      // If there are existing walls, try to snap to their endpoints
+      if (walls.length > 0) {
+        snappedPoint = snapToWall(snappedPoint, walls);
+      }
+
+      debugLogger("Snapped point", {
+        original: canvasPoint,
+        snapped: snappedPoint,
+        snapToGrid: shouldSnapToGrid,
+        snapGridSize
+      });
+
+      if (!wallInProgress) {
+        // Start new wall
+        const newWall = createWall(snappedPoint, snappedPoint);
+        debugLogger("Starting new wall", { 
+          startPoint: snappedPoint,
+          wallId: newWall.id,
+          shouldSnapToGrid,
+          snapGridSize
+        });
+        dispatch(startWall(newWall));
+      } else {
+        // Only finish wall if end point is different from start point
+        if (!arePointsEqual(wallInProgress.start, snappedPoint)) {
+          // Update end point and finish wall
+          const finalWall = { ...wallInProgress, end: snappedPoint };
+          debugLogger("Finishing wall", { 
+            start: wallInProgress.start,
+            end: snappedPoint,
+            wallId: wallInProgress.id,
+            shouldSnapToGrid,
+            snapGridSize,
+            distance: getDistance(wallInProgress.start, snappedPoint)
+          });
+          debugLogger("About to dispatch updateWallEnd", finalWall);
+          dispatch(updateWallEnd(finalWall));
+          debugLogger("About to dispatch finishWall");
+          dispatch(finishWall({}));
+        } else {
+          // Cancel wall if clicked on start point
+          debugLogger("Canceling wall - same point", {
+            start: wallInProgress.start,
+            end: snappedPoint
+          });
+          dispatch(cancelWall());
+        }
+      }
+      return;
     }
 
-    // Room preview
-    if (selectedTool === "room" && roomClickStart && roomPreviewEnd) {
-      const startX = roomClickStart.x;
-      const startY = roomClickStart.y;
-      const endX = roomPreviewEnd.x;
-      const endY = roomPreviewEnd.y;
-      ctx.save();
-      ctx.setLineDash([5, 3]);
-      ctx.strokeStyle = "#888";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.rect(
-        Math.min(startX, endX),
-        Math.min(startY, endY),
-        Math.abs(endX - startX),
-        Math.abs(endY - startY)
-      );
-      ctx.stroke();
-      ctx.restore();
+    // Handle selection
+    if (activeTool === "select") {
+      // Check for wall selection
+      let closestWall: WallData | null = null;
+      let minDist = WALL_THRESHOLD;
+      let clickProjection = { x: 0, y: 0 };
+      
+      // Log all walls for debugging
+      debugLogger("Checking walls", { 
+        numWalls: walls.length,
+        threshold: WALL_THRESHOLD,
+        walls: walls.map((wall: WallData) => ({ id: wall.id, start: wall.start, end: wall.end }))
+      });
+
+      for (const wall of walls) {
+        const dx = wall.end.x - wall.start.x;
+        const dy = wall.end.y - wall.start.y;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        
+        const t = Math.max(0, Math.min(1, ((canvasPoint.x - wall.start.x) * dx + (canvasPoint.y - wall.start.y) * dy) / (length * length)));
+        const projX = wall.start.x + t * dx;
+        const projY = wall.start.y + t * dy;
+        const distance = Math.sqrt((canvasPoint.x - projX) * (canvasPoint.x - projX) + (canvasPoint.y - projY) * (canvasPoint.y - projY));
+        
+        debugLogger("Wall distance check", { 
+          wallId: wall.id,
+          distance,
+          minDist,
+          projection: { x: projX, y: projY }
+        });
+
+        if (distance < minDist) {
+          minDist = distance;
+          closestWall = wall;
+          clickProjection = { x: projX, y: projY };
+          debugLogger("New closest wall", { 
+            wallId: wall.id, 
+            distance: minDist,
+            projection: clickProjection
+          });
+        }
+      }
+
+      if (closestWall) {
+        debugLogger("Wall selected", {
+          wallId: closestWall.id,
+          clickPoint: clickProjection,
+          menuPosition: { x: e.clientX, y: e.clientY }
+        });
+        dispatch(selectWall(closestWall.id));
+        setContextMenuPosition({ x: e.clientX, y: e.clientY });
+        setClickPoint(clickProjection);
+      } else {
+        debugLogger("Nothing selected");
+        dispatch(deselectWall({}));
+        setContextMenuPosition(null);
+        setClickPoint(null);
+      }
     }
-  }, [
-    walls,
-    wallInProgress,
-    selectedTool,
-    roomClickStart,
-    roomPreviewEnd,
-    showMeasurements,
-    uiState.angleSnapEnabled,
-    selectedWallId
-  ]);
+  }, [dispatch, walls, activeTool, wallInProgress]);
 
-  useEffect(() => {
-    const resizeCanvas = () => {
-      if (!canvasRef.current) return;
-      const parent = canvasRef.current.parentElement;
-      if (!parent) return;
-      const rect = parent.getBoundingClientRect();
-      canvasRef.current.width = rect.width;
-      canvasRef.current.height = rect.height;
-      redraw();
-    };
-    resizeCanvas();
-    window.addEventListener("resize", resizeCanvas);
-    return () => {
-      window.removeEventListener("resize", resizeCanvas);
-    };
-  }, [redraw]);
+  // Handle context menu actions
+  const handleContextMenuAction = useCallback((action: string) => {
+    debugLogger("Context menu action", { 
+      action, 
+      selectedWallId,
+      clickPoint,
+      walls: walls.map((wall: WallData) => ({ id: wall.id, start: wall.start, end: wall.end }))
+    });
 
-  useEffect(() => {
-    redraw();
-  }, [redraw]);
+    switch (action) {
+      case 'split':
+        if (selectedWallId && clickPoint) {
+          const wall = walls.find((wall: WallData) => wall.id === selectedWallId);
+          debugLogger("Split wall attempt", { wall, clickPoint });
+          if (wall) {
+            // Create two new walls from the split point
+            const wall1 = createWall(wall.start, clickPoint);
+            const wall2 = createWall(clickPoint, wall.end);
+            dispatch(deleteWall(selectedWallId));
+            dispatch(addWall(wall1));
+            dispatch(addWall(wall2));
+            debugLogger("Wall split complete", { 
+              originalWall: wall,
+              newWalls: [wall1, wall2]
+            });
+          }
+        }
+        break;
+
+      case 'newWall':
+        if (clickPoint) {
+          debugLogger("Start new wall", { startPoint: clickPoint });
+          const newWall = createWall(clickPoint, clickPoint);
+          dispatch(startWall(newWall));
+        }
+        break;
+
+      case 'curve':
+        if (selectedWallId && clickPoint) {
+          const wall = walls.find((wall: WallData) => wall.id === selectedWallId);
+          debugLogger("Curve wall attempt", { wall, clickPoint });
+          if (wall) {
+            dispatch(updateWall({
+              ...wall,
+              type: 'curved',
+              controlPoint: clickPoint
+            }));
+            debugLogger("Wall curved", { 
+              wallId: wall.id,
+              controlPoint: clickPoint 
+            });
+          }
+        }
+        break;
+
+      case 'delete':
+        if (selectedWallId) {
+          debugLogger("Delete wall", { wallId: selectedWallId });
+          dispatch(deleteWall(selectedWallId));
+          dispatch(deselectWall({}));
+        }
+        break;
+    }
+    setContextMenuPosition(null);
+    setClickPoint(null);
+  }, [dispatch, selectedWallId, walls, clickPoint]);
+
+  // Handle closing context menu
+  const handleCloseContextMenu = useCallback(() => {
+    debugLogger("Close context menu");
+    setContextMenuPosition(null);
+    setClickPoint(null);
+  }, []);
+
+  // Render context menu
+  const renderContextMenu = () => {
+    debugLogger("Render context menu", {
+      position: contextMenuPosition,
+      selectedWallId,
+      clickPoint
+    });
+
+    if (!contextMenuPosition) {
+      debugLogger("No context menu - no position");
+      return null;
+    }
+
+    const selectedType = selectedWallId ? 'wall' : null;
+    if (!selectedType) {
+      debugLogger("No context menu - no selection");
+      return null;
+    }
+
+    return (
+      <ContextMenu
+        position={contextMenuPosition}
+        onClose={handleCloseContextMenu}
+        onAction={handleContextMenuAction}
+        selectedType={selectedType}
+        clickPoint={clickPoint}
+      />
+    );
+  };
 
   return (
-    <div
-      style={{ position: "relative", width: "100%", height: "100%" }}
-      tabIndex={0}
-    >
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
       <canvas
         ref={canvasRef}
-        style={{
-          position: "relative",
-          width: "100%",
-          height: "100%",
-          zIndex: 2,
-          backgroundColor: "#ccc"
-        }}
         onMouseMove={handleMouseMove}
         onClick={handleClick}
-        onContextMenu={handleContextMenu}
+        style={{ width: "100%", height: "100%", backgroundColor: "#ccc" }}
       />
-      {uiState.showGrid && <Grid width={0} height={0} />}
-      {contextMenuOpen && (
-        <WallContextMenu
-          open={contextMenuOpen}
-          anchorPoint={contextMenuPosition}
-          wall={contextMenuWall}
-          clickPoint={contextClickPoint}
-          onClose={() => setContextMenuOpen(false)}
-          onStartNewWall={(startPt) => {
-            dispatch(
-              startWall({
-                id: "temp-wall",
-                type: "straight",
-                start: startPt,
-                end: startPt,
-                thickness: 10,
-                height: 100
-              })
-            );
-            dispatch(setSelectedTool("wall"));
-          }}
-        />
-      )}
+      {renderContextMenu()}
+      {showGrid && <Grid width={0} height={0} />}
     </div>
   );
 };

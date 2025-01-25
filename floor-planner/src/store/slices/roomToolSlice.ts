@@ -1,39 +1,33 @@
 import { createSlice, PayloadAction, createAsyncThunk } from "@reduxjs/toolkit";
 import { addWalls } from "./floorPlannerSlice";
-import { DEFAULT_WALL_HEIGHT, DEFAULT_WALL_THICKNESS } from "../../constants"; 
+import { detectRooms } from "./roomSlice";
+import { DEFAULT_WALL_HEIGHT, DEFAULT_WALL_THICKNESS } from "../../constants";
 import { v4 as uuidv4 } from "uuid";
 import { Point2D, RoomData, WallData } from "../../types";
-import type { AppDispatch } from "../store";
+import type { AppDispatch, RootState } from "../store";
 
-interface RectangularRoomPoints {
+interface RectPoints {
   start: Point2D;
   end: Point2D;
 }
 
 /**
  * createRectangularRoom
- * Skips rectangles smaller than 5x5 in canvas units to avoid partial or single-wall scenarios.
- * Now uses addWalls so that the entire set of walls can be undone at once.
+ * No minimum-size or corner-check. We just add 4 walls and detect rooms.
  */
 export const createRectangularRoom = createAsyncThunk<
   void,
-  RectangularRoomPoints,
-  { dispatch: AppDispatch }
+  RectPoints,
+  { dispatch: AppDispatch; state: RootState }
 >(
   "roomTool/createRectangularRoom",
-  async ({ start, end }, { dispatch }) => {
+  async ({ start, end }, { dispatch, getState }) => {
     const minX = Math.min(start.x, end.x);
     const maxX = Math.max(start.x, end.x);
     const minY = Math.min(start.y, end.y);
     const maxY = Math.max(start.y, end.y);
 
-    const width = maxX - minX;
-    const depth = maxY - minY;
-
-    if (width < 5 || depth < 5) {
-      return;
-    }
-
+    // Build 4 walls
     const walls: WallData[] = [
       {
         id: uuidv4(),
@@ -69,8 +63,10 @@ export const createRectangularRoom = createAsyncThunk<
       }
     ];
 
-    // Instead of multiple startWall/finishWall calls, just add them at once
+    // Add them, then detect rooms
     dispatch(addWalls(walls));
+    const newWalls = getState().floorPlanner.present.walls;
+    dispatch(detectRooms({ walls: newWalls }));
   }
 );
 
@@ -142,7 +138,7 @@ const roomToolSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(createRectangularRoom.fulfilled, () => {
-      // No special state updates needed
+      // no extra
     });
   }
 });

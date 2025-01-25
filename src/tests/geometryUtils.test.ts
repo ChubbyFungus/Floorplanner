@@ -1,51 +1,55 @@
-import { calculateWallIntersection, getWallLength, calculateWallAngle } from '../utils/geometryUtils';
+import { calculatePolygonArea, type Point2D } from '@floor-planner/utils/geometryUtils';
 
-describe('geometryUtils', () => {
-  describe('calculateWallIntersection', () => {
-    test('should find intersection of perpendicular walls', () => {
-      const wall1 = { start: { x: 0, y: 0 }, end: { x: 10, y: 0 } };
-      const wall2 = { start: { x: 5, y: -5 }, end: { x: 5, y: 5 } };
-      expect(calculateWallIntersection(wall1, wall2)).toEqual({ x: 5, y: 0 });
-    });
-
-    test('should return null for parallel walls', () => {
-      const wall1 = { start: { x: 0, y: 0 }, end: { x: 10, y: 0 } };
-      const wall2 = { start: { x: 0, y: 2 }, end: { x: 10, y: 2 } };
-      expect(calculateWallIntersection(wall1, wall2)).toBeNull();
-    });
-
-    test('should handle floating point precision', () => {
-      const wall1 = { start: { x: 0.1, y: 0.2 }, end: { x: 10.3, y: 0.4 } };
-      const wall2 = { start: { x: 5.5, y: -0.1 }, end: { x: 5.5, y: 0.5 } };
-      const result = calculateWallIntersection(wall1, wall2);
-      expect(result?.x).toBeCloseTo(5.5, 6);
-      expect(result?.y).toBeCloseTo(0.3, 6);
-    });
+describe('calculatePolygonArea', () => {
+  it('calculates area of a square', () => {
+    const square: Point2D[] = [
+      {x: 0, y: 0},
+      {x: 10, y: 0},
+      {x: 10, y: 10},
+      {x: 0, y: 10}
+    ];
+    expect(calculatePolygonArea(square)).toBe(100);
   });
 
-  describe('getWallLength', () => {
-    test('should calculate horizontal length', () => {
-      const wall = { start: { x: 0, y: 0 }, end: { x: 10, y: 0 } };
-      expect(getWallLength(wall)).toBeCloseTo(10, 6);
-    });
-
-    test('should calculate diagonal length', () => {
-      const wall = { start: { x: 0, y: 0 }, end: { x: 3, y: 4 } };
-      expect(getWallLength(wall)).toBeCloseTo(5, 6);
-    });
+  it('calculates area of a rectangle', () => {
+    const rect: Point2D[] = [
+      {x: 0, y: 0},
+      {x: 20, y: 0},
+      {x: 20, y: 5},
+      {x: 0, y: 5}
+    ];
+    expect(calculatePolygonArea(rect)).toBe(100);
   });
 
-  describe('calculateWallAngle', () => {
-    test('should calculate right angle', () => {
-      const wall1 = { start: { x: 0, y: 0 }, end: { x: 10, y: 0 } };
-      const wall2 = { start: { x: 10, y: 0 }, end: { x: 10, y: 10 } };
-      expect(calculateWallAngle(wall1, wall2)).toBeCloseTo(90, 6);
-    });
+  it('calculates area of a concave polygon', () => {
+    const concave: Point2D[] = [
+      {x: 0, y: 0},
+      {x: 10, y: 0},
+      {x: 10, y: 5},
+      {x: 5, y: 5},
+      {x: 5, y: 10},
+      {x: 0, y: 10}
+    ];
+    expect(calculatePolygonArea(concave)).toBe(75);
+  });
 
-    test('should handle acute angles', () => {
-      const wall1 = { start: { x: 0, y: 0 }, end: { x: 10, y: 0 } };
-      const wall2 = { start: { x: 10, y: 0 }, end: { x: 15, y: 5 } };
-      expect(calculateWallAngle(wall1, wall2)).toBeCloseTo(45, 6);
-    });
+  it('handles triangles', () => {
+    const triangle: Point2D[] = [
+      {x: 0, y: 0},
+      {x: 10, y: 0},
+      {x: 5, y: 8.66}
+    ];
+    expect(calculatePolygonArea(triangle)).toBeCloseTo(43.3, 1);
+  });
+
+  it('returns zero for invalid polygons', () => {
+    const line: Point2D[] = [
+      {x: 0, y: 0},
+      {x: 10, y: 0}
+    ];
+    expect(calculatePolygonArea(line)).toBe(0);
+    
+    const singlePoint: Point2D[] = [{x: 5, y: 5}];
+    expect(calculatePolygonArea(singlePoint)).toBe(0);
   });
 });

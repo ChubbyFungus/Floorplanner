@@ -12,12 +12,18 @@
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "allowJs": false,
-    "noEmit": true,
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "noEmit": false,
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@floor-planner/utils/*": ["./src/utils/*"]
     }
   },
   "include": [

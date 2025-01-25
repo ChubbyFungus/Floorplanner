@@ -3,7 +3,8 @@ import {
   getDistance,
   snapToGrid,
   arePointsEqual,
-  PIXELS_PER_FOOT
+  PIXELS_PER_FOOT,
+  calculatePolygonArea
 } from '../utils/geometryUtils';
 
 describe('geometryUtils', () => {
@@ -39,6 +40,45 @@ describe('geometryUtils', () => {
   describe('PIXELS_PER_FOOT constant', () => {
     it('is a positive number, used for scale conversion', () => {
       expect(PIXELS_PER_FOOT).toBeGreaterThan(0);
+    });
+  });
+
+  describe('calculatePolygonArea', () => {
+    it('calculates correct area for a square in square feet', () => {
+      const square = [
+        {x: 0, y: 0},
+        {x: 100, y: 0}, // 4ft (100px / 25px per ft)
+        {x: 100, y: 100},
+        {x: 0, y: 100}
+      ];
+      // 100x100px = (4ft x 4ft) = 16 sq ft
+      expect(calculatePolygonArea(square)).toBeCloseTo(16);
+    });
+
+    it('auto-closes unclosed polygons', () => {
+      const triangle = [
+        {x: 0, y: 0},
+        {x: 75, y: 0}, // 3ft
+        {x: 0, y: 100} // 4ft
+      ];
+      // Area of triangle: (base * height)/2 = (3ft * 4ft)/2 = 6 sq ft
+      expect(calculatePolygonArea(triangle)).toBeCloseTo(6);
+    });
+
+    it('handles floating point coordinates accurately', () => {
+      const shape = [
+        {x: 25, y: 25}, // 1ft
+        {x: 75.5, y: 25},
+        {x: 75.5, y: 75.5},
+        {x: 25, y: 75.5}
+      ];
+      // (2.02ft x 2.02ft) = ~4.08 sq ft
+      expect(calculatePolygonArea(shape)).toBeCloseTo(4.08, 1);
+    });
+
+    it('returns 0 for degenerate polygons', () => {
+      expect(calculatePolygonArea([{x:0,y:0}, {x:10,y:10}])).toBe(0);
+      expect(calculatePolygonArea([])).toBe(0);
     });
   });
 });

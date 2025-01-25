@@ -22,13 +22,19 @@ export const RoomLabel: React.FC<RoomLabelProps> = ({
   onFinishEdit
 }) => {
   const dispatch = useDispatch();
-  const [editName, setEditName] = React.useState(room.name);
+  // Provide default empty string if name is undefined
+  const [editName, setEditName] = React.useState(room.name || '');
 
   const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setEditName(event.target.value);
   };
 
   const handleNameSubmit = () => {
+    // Ensure we have a valid room ID
+    if (!room.id) {
+      console.error('Room ID is undefined');
+      return;
+    }
     dispatch(setRoomName({ id: room.id, name: editName }));
     onFinishEdit();
   };
@@ -39,13 +45,17 @@ export const RoomLabel: React.FC<RoomLabelProps> = ({
     }
   };
 
+  // Ensure position values are numbers, default to 0 if undefined
+  const posX = typeof position.x === 'number' ? position.x : 0;
+  const posY = typeof position.y === 'number' ? position.y : 0;
+
   return (
     <Paper
       elevation={2}
       sx={{
         position: 'absolute',
-        left: position.x,
-        top: position.y,
+        left: posX,
+        top: posY,
         transform: 'translate(-50%, -50%)',
         padding: 1,
         minWidth: 100,
@@ -61,30 +71,16 @@ export const RoomLabel: React.FC<RoomLabelProps> = ({
             onChange={handleNameChange}
             onKeyPress={handleKeyPress}
             autoFocus
-            sx={{ marginRight: 1 }}
           />
-          <IconButton
-            size="small"
-            onClick={handleNameSubmit}
-            color="primary"
-          >
+          <IconButton size="small" onClick={handleNameSubmit}>
             <CheckIcon />
           </IconButton>
         </div>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography variant="body2" sx={{ marginRight: 1 }}>
-            {room.name}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {Math.round(room.area)}m²
-          </Typography>
-          <IconButton
-            size="small"
-            onClick={onStartEdit}
-            sx={{ marginLeft: 1 }}
-          >
-            <EditIcon fontSize="small" />
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <Typography variant="body2">{room.name || 'Unnamed Room'}</Typography>
+          <IconButton size="small" onClick={onStartEdit}>
+            <EditIcon />
           </IconButton>
         </div>
       )}

@@ -10,7 +10,8 @@ interface Fixture3DProps {
 
 export const Fixture3D: React.FC<Fixture3DProps> = ({ fixture }) => {
   const meshRef = useRef<Mesh>(null);
-  const material = useMaterial(fixture.materialId);
+  // Assert materialId as string | undefined to match the type in FixtureData
+  const material = useMaterial(fixture.materialId as string | undefined);
 
   // Debug logging
   console.log('Fixture object:', {
@@ -25,15 +26,17 @@ export const Fixture3D: React.FC<Fixture3DProps> = ({ fixture }) => {
   });
 
   const position3D = useMemo(() => {
-    return [fixture.position.x, fixture.dimensions.height / 2, -fixture.position.y] as [
-      number,
-      number,
-      number
-    ];
-  }, [fixture]);
+    return [
+      fixture.position.x, 
+      fixture.dimensions.height / 2, 
+      -fixture.position.y
+    ] as [number, number, number];
+  }, [fixture.position.x, fixture.position.y, fixture.dimensions.height]);
 
   const rotationY = useMemo(() => {
-    return (fixture.rotation * Math.PI) / 180;
+    // Ensure rotation is treated as a number with default value of 0
+    const rotation = typeof fixture.rotation === 'number' ? fixture.rotation : 0;
+    return (rotation * Math.PI) / 180;
   }, [fixture.rotation]);
 
   useFrame(() => {
@@ -42,7 +45,11 @@ export const Fixture3D: React.FC<Fixture3DProps> = ({ fixture }) => {
 
   return (
     <mesh ref={meshRef} position={position3D} rotation={[0, rotationY, 0]}>
-      <boxGeometry args={[fixture.dimensions.width, fixture.dimensions.height, fixture.dimensions.depth]} />
+      <boxGeometry args={[
+        fixture.dimensions.width,
+        fixture.dimensions.height,
+        fixture.dimensions.depth
+      ]} />
       {material ? (
         <primitive object={material} attach="material" />
       ) : (

@@ -1,8 +1,12 @@
 import { Point2D, WallData } from '../types';
 
+/**
+ * List of standard angles (every 45°) to snap to, if angleSnapEnabled.
+ */
 export const SNAP_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315, 360];
-// Increase tolerance to strengthen snap
-export const SNAP_TOLERANCE = 20; 
+
+/** Snap tolerance in degrees. Increase if you want more "sticky" snapping. */
+export const SNAP_TOLERANCE = 15;
 
 export type AngleType = 'parallel' | 'perpendicular' | 'standard';
 
@@ -14,76 +18,92 @@ export interface AngleGuide {
   type: AngleType;
 }
 
+/**
+ * calculateAngle
+ * Returns angle in degrees between 0..360
+ */
 export const calculateAngle = (start: Point2D, end: Point2D): number => {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
-  let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-  if (angle < 0) angle += 360;
-  return angle;
+  let angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+  // Normalize so 0 <= angleDeg < 360
+  if (angleDeg < 0) angleDeg += 360;
+  return angleDeg;
 };
 
+/**
+ * findNearestSnapAngle
+ * Permits a full 360 range. No forced ±180 wrap.
+ */
 export const findNearestSnapAngle = (
   angle: number,
   existingWalls: WallData[] = []
 ): { angle: number; type: AngleType } | null => {
-  let bestAngle = null;
+  let bestAngle: number | null = null;
   let bestDiff = SNAP_TOLERANCE;
-  let type: AngleType = 'standard';
+  let snappedType: AngleType = 'standard';
 
-  // Check standard snap angles
-  SNAP_ANGLES.forEach(snapAngle => {
+  // 1) Check standard angles
+  for (const snapAngle of SNAP_ANGLES) {
     const diff = Math.abs(angle - snapAngle);
-    const diffWrapped = Math.min(diff, 360 - diff);
-    if (diffWrapped < bestDiff) {
+    if (diff < bestDiff) {
       bestAngle = snapAngle;
-      bestDiff = diffWrapped;
-      type = 'standard';
+      bestDiff = diff;
+      snappedType = 'standard';
     }
-  });
+  }
 
-  // Check existing wall angles for parallel and perpendicular
-  existingWalls.forEach(wall => {
-    const wallAngle = calculateAngle(wall.start, wall.end);
-    
-    // Check parallel
+  // 2) Check existing wall angles for parallel/perpendicular
+  for (const w of existingWalls) {
+    const wallAngle = calculateAngle(w.start, w.end);
+
+    // parallel
     const diffParallel = Math.abs(angle - wallAngle);
-    const diffParallelWrapped = Math.min(diffParallel, 360 - diffParallel);
-    if (diffParallelWrapped < bestDiff) {
+    if (diffParallel < bestDiff) {
       bestAngle = wallAngle;
-      bestDiff = diffParallelWrapped;
-      type = 'parallel';
+      bestDiff = diffParallel;
+      snappedType = 'parallel';
     }
 
-    // Check perpendicular
+    // perpendicular
     const perpAngle = (wallAngle + 90) % 360;
     const diffPerp = Math.abs(angle - perpAngle);
-    const diffPerpWrapped = Math.min(diffPerp, 360 - diffPerp);
-    if (diffPerpWrapped < bestDiff) {
+    if (diffPerp < bestDiff) {
       bestAngle = perpAngle;
-      bestDiff = diffPerpWrapped;
-      type = 'perpendicular';
+      bestDiff = diffPerp;
+      snappedType = 'perpendicular';
     }
-  });
+  }
 
-  return bestAngle !== null ? { angle: bestAngle, type } : null;
+  if (bestAngle !== null) {
+    return { angle: bestAngle, type: snappedType };
+  }
+  return null;
 };
 
+/**
+ * snapPointToAngle
+ * Shifts 'end' to match the distance and nearest angle from 'start'.
+ */
 export const snapPointToAngle = (
   start: Point2D,
   end: Point2D,
   snapAngle: number
 ): Point2D => {
-  const distance = Math.sqrt(
-    Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)
-  );
-  const angleInRadians = (snapAngle * Math.PI) / 180;
-
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  const angleRad = (snapAngle * Math.PI) / 180;
   return {
-    x: start.x + distance * Math.cos(angleInRadians),
-    y: start.y + distance * Math.sin(angleInRadians)
+    x: start.x + distance * Math.cos(angleRad),
+    y: start.y + distance * Math.sin(angleRad)
   };
 };
 
+/**
+ * generateAngleGuides
+ * Creates dashed guide lines for standard angles and parallel/perp angles near currentAngle.
+ */
 export const generateAngleGuides = (
   start: Point2D,
   end: Point2D,
@@ -91,65 +111,58 @@ export const generateAngleGuides = (
   existingWalls: WallData[] = []
 ): AngleGuide[] => {
   const guides: AngleGuide[] = [];
-  const distance = Math.sqrt(
-    Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)
-  );
+  const distance = Math.sqrt((end.x - start.x)**2 + (end.y - start.y)**2);
 
-  // Find nearest snap angle including parallel/perpendicular
-  const nearestSnap = findNearestSnapAngle(currentAngle, existingWalls);
-  
-  // Generate guides for standard snap angles
-  SNAP_ANGLES.forEach(snapAngle => {
+  // Which angle are we actually snapping to?
+  const nearest = findNearestSnapAngle(currentAngle, existingWalls);
+
+  // 1) Standard angles
+  for (const snapAngle of SNAP_ANGLES) {
     const diff = Math.abs(currentAngle - snapAngle);
-    const diffWrapped = Math.min(diff, 360 - diff);
-    
-    // Show guides if we're within roughly double the tolerance
-    if (diffWrapped < SNAP_TOLERANCE * 2) {
-      const angleInRadians = (snapAngle * Math.PI) / 180;
+    if (diff <= SNAP_TOLERANCE * 1.5) {
+      const angleRad = (snapAngle * Math.PI) / 180;
       const guideEnd = {
-        x: start.x + distance * Math.cos(angleInRadians),
-        y: start.y + distance * Math.sin(angleInRadians)
+        x: start.x + distance * Math.cos(angleRad),
+        y: start.y + distance * Math.sin(angleRad)
       };
-
       guides.push({
         angle: snapAngle,
         start,
         end: guideEnd,
-        isSnapped: nearestSnap?.angle === snapAngle,
+        isSnapped: nearest?.angle === snapAngle && nearest?.type === 'standard',
         type: 'standard'
       });
     }
-  });
+  }
 
-  // Add guides for parallel and perpendicular
-  existingWalls.forEach(wall => {
-    const wallAngle = calculateAngle(wall.start, wall.end);
-    const angles = [
-      { angle: wallAngle, type: 'parallel' as const },
-      { angle: (wallAngle + 90) % 360, type: 'perpendicular' as const }
+  // 2) Parallel / Perp to existing walls
+  for (const w of existingWalls) {
+    const wAngle = calculateAngle(w.start, w.end);
+    const anglesToCheck: Array<{ angle: number; t: AngleType }> = [
+      { angle: wAngle, t: 'parallel' },
+      { angle: (wAngle + 90) % 360, t: 'perpendicular' }
     ];
 
-    angles.forEach(({ angle, type }) => {
-      const diff = Math.abs(currentAngle - angle);
-      const diffWrapped = Math.min(diff, 360 - diff);
-      
-      if (diffWrapped < SNAP_TOLERANCE * 2) {
-        const angleInRadians = (angle * Math.PI) / 180;
+    for (const candidate of anglesToCheck) {
+      const diff = Math.abs(currentAngle - candidate.angle);
+      if (diff <= SNAP_TOLERANCE * 1.5) {
+        const angleRad = (candidate.angle * Math.PI) / 180;
         const guideEnd = {
-          x: start.x + distance * Math.cos(angleInRadians),
-          y: start.y + distance * Math.sin(angleInRadians)
+          x: start.x + distance * Math.cos(angleRad),
+          y: start.y + distance * Math.sin(angleRad)
         };
-
         guides.push({
-          angle,
+          angle: candidate.angle,
           start,
           end: guideEnd,
-          isSnapped: nearestSnap?.angle === angle && nearestSnap?.type === type,
-          type
+          isSnapped:
+            nearest?.angle === candidate.angle &&
+            nearest?.type === candidate.t,
+          type: candidate.t
         });
       }
-    });
-  });
+    }
+  }
 
   return guides;
 };

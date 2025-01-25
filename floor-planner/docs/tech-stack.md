@@ -5,34 +5,41 @@
 ### React (v18.3.1)
 - **Official Documentation**: [React.dev](https://react.dev/)
 - Key Features Used:
-  - Component Architecture [^1]
+  - Component Architecture
   - Hooks System
-  - JSX Syntax
+  - Concurrent Mode
   - Context API
-  - Concurrent Mode (React 18)
+  - Error Boundaries
 
-[^1]: From React.dev: "React apps are made out of components. A component is a piece of the UI (user interface) that has its own logic and appearance."
-
-### TypeScript
+### TypeScript (v5.2+)
 - **Official Documentation**: [TypeScript Handbook](https://www.typescriptlang.org/docs/)
-- **React Integration**: [TypeScript React Guide](https://www.typescriptlang.org/docs/handbook/react.html)
 - Key Features Used:
-  - Static Type Checking
-  - Interface Definitions
-  - Generics
-  - Type Inference
-  - Module System
+  - Strict Type Checking
+  - Advanced Type Inference
+  - Decorator Support
+  - Module Resolution
+  - TSX Support
 
-### Three.js (via React Three Fiber)
-- **Official Documentation**: 
-  - [React Three Fiber Docs](https://docs.pmnd.rs/react-three-fiber)
-  - [Three.js Docs](https://threejs.org/docs/)
-- Key Features Used:
-  - Canvas Setup
-  - Scene Management
-  - 3D Rendering
-  - Camera Controls
-  - Material System
+### Vite (v4.5+)
+- **Official Documentation**: [Vite Guide](https://vitejs.dev/)
+- Key Features:
+  - Lightning Fast HMR
+  - Rollup-based Build
+  - TypeScript Native Support
+  - Plugin Ecosystem
+
+### Three.js Ecosystem
+- **Versions**:
+  - Three.js r158
+  - @react-three/fiber v11
+  - @react-three/drei v11
+  - @react-three/postprocessing v8
+- **Key Features**:
+  - Physically-Based Rendering (PBR) Materials
+  - Suspense-based Asset Loading
+  - Custom GLSL Shaders
+  - Post-Processing Effects Stack
+  - Optimized Instanced Meshes
 
 ### Material-UI (MUI)
 - **Official Documentation**: [MUI Getting Started](https://mui.com/material-ui/getting-started/)
@@ -45,14 +52,14 @@
 
 [^2]: From MUI docs: "Material UI includes a comprehensive collection of prebuilt components that are ready for use in production right out of the box."
 
-### Redux Toolkit
+### Redux Toolkit (v2.2+)
 - **Official Documentation**: [Redux Toolkit](https://redux-toolkit.js.org/)
-- Key Features [^3]:
-  - `configureStore`: Enhanced store setup
-  - `createSlice`: Simplified reducer logic
-  - `createAsyncThunk`: Async action handling
-  - `createEntityAdapter`: Normalized state management
-  - RTK Query: Data fetching and caching
+- Key Features:
+  - `configureStore` with DevTools
+  - `createSlice` reducer logic
+  - `createAsyncThunk` middleware
+  - RTK Query API
+  - TypeScript-first approach
 
 [^3]: Features list from Redux Toolkit's "What's Included" section: https://redux-toolkit.js.org/introduction/getting-started
 
@@ -68,14 +75,22 @@
 
 ## Testing
 
-### Jest
-- **Official Documentation**: [Jest](https://jestjs.io/)
-- **React Testing Library**: [Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
+### Vitest (v1.2+)
+- **Official Documentation**: [Vitest](https://vitest.dev/)
 - Key Features:
-  - Unit Testing
+  - Vite-native Test Runner
+  - TypeScript Support
   - Component Testing
-  - Mocking System
   - Snapshot Testing
+  - Benchmarking
+
+### React Testing Library (v14.2+)
+- **Official Documentation**: [Testing Library](https://testing-library.com/)
+- Key Features:
+  - User-Centric Testing
+  - Accessibility Checks
+  - Component Interaction
+  - Async Testing
 
 ## Version Control Best Practices
 

@@ -1,268 +1,364 @@
 import { FixtureData, RoomData } from "../types";
 /// <reference types="earcut" />
+import { debugLogger } from "./debugLogger";
 
 export interface Point2D {
-    x: number;
-    y: number;
+  x: number;
+  y: number;
 }
 
 export type WallData = {
-    start: Point2D;
-    end: Point2D;
-    controlPoints?: Point2D[];
-    height?: number;
+  start: Point2D;
+  end: Point2D;
+  controlPoints?: Point2D[];
+  height?: number;
+  thickness?: number;
+  material?: string;
+  id: string;
 };
+
 import earcut from "earcut";
 
-/**
- * Pixel-to-foot ratio for 2D drawing.
- */
-// Unit conversion constants
-export const PIXELS_PER_FOOT = 25;
-export const PIXELS_PER_INCH = PIXELS_PER_FOOT / 12;
-export const INCHES_TO_FEET = 1 / 12;
-export const SQUARE_INCHES_TO_SQUARE_FEET = 1 / 144;
+// Constants for unit conversion
+export const PIXELS_PER_FOOT = 25;  // 25 pixels = 1 foot (reduced from 50 for more space)
+export const PIXELS_PER_INCH = PIXELS_PER_FOOT / 12;  // pixels per inch
 
-export const POINT_TOLERANCE = 30;
-export const LINE_SNAP_TOLERANCE = 20;
+// Constants for geometry calculations
+export const POINT_TOLERANCE = 30; // Increased for even easier snapping
+export const LINE_SNAP_TOLERANCE = 20; // Tolerance for snapping to wall lines
 
 interface CalcResult {
   totalArea: number;
   totalVolume: number;
 }
 
-/**
- * computeArea
- * Takes an array of 2D points forming a polygon, uses earcut to find area in px².
- */
-// Combined area calculation that handles both simple and complex polygons
-export function calculatePolygonArea(points: Point2D[]): number {
-  if (points.length < 3) return 0;
+export function calculateAreaAndVolume(
+  walls: WallData[],
+  fixtures: FixtureData[]
+): CalcResult {
+  console.log('\n=== Starting Area Calculation ===');
+  const wallLoops = findAllLoops(walls);
+  console.log(`Found ${wallLoops.length} room loops`);
 
-  const flatCoords: number[] = [];
-  points.forEach((p) => {
-    flatCoords.push(p.x, p.y);
+  // Calculate area for each loop and track which rooms are inside others
+  interface RoomInfo {
+    area: number;
+    containedBy: number[]; // indices of rooms that contain this room
+  }
+  const roomInfos: RoomInfo[] = [];
+
+  wallLoops.forEach((loop, index) => {
+    console.log(`\nAnalyzing Loop ${index}:`);
+    const polygonPoints = subdivideWallsIntoPolygon(loop);
+    const areaInPixels = polygonArea(polygonPoints);
+
+    // Check which rooms contain this room
+    const containedBy: number[] = [];
+    for (let i = 0; i < index; i++) {
+      if (!isLoopSeparate(wallLoops[i], loop)) {  // Check if loop[i] is inside current loop
+        console.log(`Loop ${index} is contained within loop ${i}`);
+        containedBy.push(i);
+      }
+    }
+
+    roomInfos.push({
+      area: areaInPixels,
+      containedBy
+    });
+
+    console.log(`Loop ${index} area: ${areaInPixels} pixels² (${areaInPixels / (PIXELS_PER_FOOT * PIXELS_PER_FOOT)} sq ft)`);
+    console.log(`Contained by rooms:`, containedBy);
   });
 
-  const triangles = earcut(flatCoords);
-  let area = 0;
-  for (let i = 0; i < triangles.length; i += 3) {
-    const i1 = triangles[i] * 2;
-    const i2 = triangles[i + 1] * 2;
-    const i3 = triangles[i + 2] * 2;
+  // Calculate total area by only adding separate rooms
+  let totalRawArea = 0;
+  roomInfos.forEach((info, index) => {
+    if (info.containedBy.length === 0) {
+      // This is a separate room - add its area
+      console.log(`Adding separate room ${index} area: ${info.area}`);
+      totalRawArea += info.area;
+    } else {
+      console.log(`Skipping nested room ${index} area: ${info.area}`);
+    }
+  });
 
-    const x1 = flatCoords[i1];
-    const y1 = flatCoords[i1 + 1];
-    const x2 = flatCoords[i2];
-    const y2 = flatCoords[i2 + 1];
-    const x3 = flatCoords[i3];
-    const y3 = flatCoords[i3 + 1];
+  console.log('\nFinal calculations:');
+  console.log('Total raw area in pixels²:', totalRawArea);
 
-    area += Math.abs(triangleArea(x1, y1, x2, y2, x3, y3));
+  // Convert area to square feet
+  const totalAreaInSqFeet = totalRawArea / (PIXELS_PER_FOOT * PIXELS_PER_FOOT);
+  console.log('Total area in sq ft:', totalAreaInSqFeet);
+
+  // Calculate average height for volume (in feet)
+  const avgHeight =
+    walls.reduce((acc, w) => acc + (w.height || 96), 0) / (walls.length || 1);
+
+  const totalVolume = totalAreaInSqFeet * avgHeight;
+
+  return {
+    totalArea: totalAreaInSqFeet,
+    totalVolume
+  };
+}
+
+function findAllLoops(walls: WallData[]): WallData[][] {
+  const unused = new Set(walls.map((w) => w.id));
+  const loops: WallData[][] = [];
+
+  const startMap = new Map<string, WallData[]>();
+  const endMap = new Map<string, WallData[]>();
+
+  // Build connection maps
+  walls.forEach((w) => {
+    const startKey = pointKey(w.start);
+    const endKey = pointKey(w.end);
+
+    if (!startMap.has(startKey)) startMap.set(startKey, []);
+    startMap.get(startKey)!.push(w);
+
+    if (!endMap.has(endKey)) endMap.set(endKey, []);
+    endMap.get(endKey)!.push(w);
+  });
+
+  // Find loops
+  while (unused.size > 0) {
+    const seedWallId = unused.values().next().value;
+    const seedWall = walls.find((w) => w.id === seedWallId)!;
+    const currentLoop: WallData[] = [];
+    currentLoop.push(seedWall);
+    unused.delete(seedWallId);
+
+    let currentEnd = seedWall.end;
+    let loopStart = seedWall.start;
+
+    while (true) {
+      // Try to find a wall that connects to the current end point
+      const nextWall = walls.find(w => 
+        unused.has(w.id) && 
+        (arePointsEqual(w.start, currentEnd) || arePointsEqual(w.end, currentEnd))
+      );
+
+      if (!nextWall) {
+        // Check if we can close the loop
+        if (arePointsEqual(currentEnd, loopStart)) {
+          loops.push([...currentLoop]);
+        }
+        break;
+      }
+
+      // Add the wall to the loop
+      if (arePointsEqual(nextWall.start, currentEnd)) {
+        currentLoop.push(nextWall);
+        currentEnd = nextWall.end;
+      } else {
+        // Wall needs to be reversed
+        const reversed = reverseWall(nextWall);
+        currentLoop.push(reversed);
+        currentEnd = reversed.end;
+      }
+      unused.delete(nextWall.id);
+    }
   }
+
+  return loops;
+}
+
+function reverseWall(wall: WallData): WallData {
+  return {
+    ...wall,
+    start: { ...wall.end },
+    end: { ...wall.start },
+    controlPoints: wall.controlPoints ? [...wall.controlPoints].reverse() : []
+  };
+}
+
+function pointKey(pt: Point2D): string {
+  return `${Math.round(pt.x * 1000) / 1000}_${Math.round(pt.y * 1000) / 1000}`;
+}
+
+function subdivideWallsIntoPolygon(wallLoop: WallData[]): Point2D[] {
+  const points: Point2D[] = [];
+
+  // Log the raw wall dimensions
+  wallLoop.forEach(wall => {
+    const width = Math.abs(wall.end.x - wall.start.x);
+    const height = Math.abs(wall.end.y - wall.start.y);
+    const length = Math.sqrt(width * width + height * height);
+    console.log(`Wall dimensions - pixels: ${length}, feet: ${length/PIXELS_PER_FOOT}`);
+  });
+
+  // First, ensure all walls are properly connected
+  const connectedWalls = [...wallLoop];
+  for (let i = 0; i < connectedWalls.length; i++) {
+    const wall = connectedWalls[i];
+    const nextWall = connectedWalls[(i + 1) % connectedWalls.length];
+
+    // Check if walls need to be connected
+    if (!arePointsEqual(wall.end, nextWall.start)) {
+      const distance = getDistance(wall.end, nextWall.start);
+      console.warn(`Gap between walls at index ${i}:`, {
+        currentWallEnd: wall.end,
+        nextWallStart: nextWall.start,
+        distance
+      });
+
+      // If walls are close enough, connect them
+      if (distance < 20) { // 20 pixels threshold
+        nextWall.start = { ...wall.end };
+      }
+    }
+  }
+
+  // Now extract points from connected walls
+  connectedWalls.forEach(wall => {
+    points.push({ ...wall.start }); // Clone points to avoid reference issues
+  });
+
+  // Add the first point again to close the loop
+  if (points.length > 0) {
+    const firstPoint = points[0];
+    const lastPoint = points[points.length - 1];
+
+    // Only close the loop if the last point isn't already equal to the first
+    if (!arePointsEqual(firstPoint, lastPoint)) {
+      points.push({ ...firstPoint });
+    }
+  }
+
+  return points;
+}
+
+function polygonArea(points: Point2D[]): number {
+  if (points.length < 3) return 0;
+
+  // Ensure points are ordered correctly (clockwise)
+  const center = points.reduce((acc, p) => ({ 
+    x: acc.x + p.x / points.length, 
+    y: acc.y + p.y / points.length 
+  }), { x: 0, y: 0 });
+
+  const sortedPoints = [...points].sort((a, b) => {
+    const angleA = Math.atan2(a.y - center.y, a.x - center.x);
+    const angleB = Math.atan2(b.y - center.y, b.x - center.x);
+    return angleA - angleB;
+  });
+
+  // Use shoelace formula with sorted points
+  let area = 0;
+  for (let i = 0; i < sortedPoints.length; i++) {
+    const j = (i + 1) % sortedPoints.length;
+    area += sortedPoints[i].x * sortedPoints[j].y;
+    area -= sortedPoints[j].x * sortedPoints[i].y;
+  }
+
+  area = Math.abs(area / 2);
+  console.log('Polygon area calculation:');
+  console.log('Original points:', points);
+  console.log('Sorted points:', sortedPoints);
+  console.log('Raw area:', area);
+  console.log('Area in sq ft:', area / (PIXELS_PER_FOOT * PIXELS_PER_FOOT));
+
   return area;
 }
 
-/**
- * triangleArea
- */
-function triangleArea(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  x3: number,
-  y3: number
-) {
-  return (
-    (x1 * (y2 - y3) +
-      x2 * (y3 - y1) +
-      x3 * (y1 - y2)) /
-    2
-  );
+// Helper function to determine if one loop is separate from another
+function isLoopSeparate(loop1: WallData[], loop2: WallData[]): boolean {
+  console.log('\nChecking if loops are separate:');
+
+  // Get points for both loops
+  const points1 = subdivideWallsIntoPolygon(loop1);
+  const points2 = subdivideWallsIntoPolygon(loop2);
+
+  // First check if they share any walls
+  const sharedWalls = findSharedWalls(loop1, loop2);
+  console.log('Number of shared walls:', sharedWalls.length);
+
+  // If they share walls, check if the non-shared points of loop2 are inside loop1
+  if (sharedWalls.length > 0) {
+    // Get points that aren't part of shared walls
+    const nonSharedPoints2 = points2.filter(p2 => 
+      !sharedWalls.some(wall => 
+        arePointsEqual(p2, wall.start) || arePointsEqual(p2, wall.end)
+      )
+    );
+
+    console.log('Non-shared points from loop2:', nonSharedPoints2.length);
+
+    // If any non-shared point is outside loop1, then loop2 is separate
+    const anyPointOutside = nonSharedPoints2.some(p => !isPointInPolygon(p, points1));
+    console.log('Has points outside:', anyPointOutside);
+
+    // If all points are inside, it's nested. If any are outside, it's separate
+    return anyPointOutside;
+  }
+
+  // If no shared walls, use the original point-inside check
+  let points1Inside = 0;
+  let points2Inside = 0;
+
+  for (const point of points1) {
+    if (isPointInPolygon(point, points2)) {
+      points1Inside++;
+    }
+  }
+
+  for (const point of points2) {
+    if (isPointInPolygon(point, points1)) {
+      points2Inside++;
+    }
+  }
+
+  console.log(`Points from loop1 inside loop2: ${points1Inside}/${points1.length}`);
+  console.log(`Points from loop2 inside loop1: ${points2Inside}/${points2.length}`);
+
+  // Loops are separate if less than 2 points from loop2 are inside loop1
+  const isSeparate = points2Inside < 2;
+
+  console.log('Loops are separate:', isSeparate);
+
+  return isSeparate;
 }
 
-/**
- * isPointInPolygon
- * Standard ray-casting approach to see if point is inside polygon.
- */
-function isPointInPolygon(pt: Point2D, polygon: Point2D[]): boolean {
+// Helper function to find walls that are shared between two loops
+function findSharedWalls(loop1: WallData[], loop2: WallData[]): WallData[] {
+  const sharedWalls: WallData[] = [];
+
+  for (const wall1 of loop1) {
+    for (const wall2 of loop2) {
+      // Check if walls share both endpoints (in either direction)
+      if ((arePointsEqual(wall1.start, wall2.start) && arePointsEqual(wall1.end, wall2.end)) ||
+          (arePointsEqual(wall1.start, wall2.end) && arePointsEqual(wall1.end, wall2.start))) {
+        sharedWalls.push(wall1);
+        break;
+      }
+    }
+  }
+
+  return sharedWalls;
+}
+
+// Helper function to check if a point is inside a polygon
+export function isPointInPolygon(point: Point2D, polygon: Point2D[]): boolean {
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].x, yi = polygon[i].y;
-    const xj = polygon[j].x, yj = polygon[j].y;
-    const intersect =
-      (yi > pt.y !== yj > pt.y) &&
-      pt.x < ((xj - xi) * (pt.y - yi)) / (yj - yi) + xi;
+    const xi = polygon[i].x;
+    const yi = polygon[i].y;
+    const xj = polygon[j].x;
+    const yj = polygon[j].y;
+
+    const intersect = ((yi > point.y) !== (yj > point.y))
+      && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
     if (intersect) inside = !inside;
   }
   return inside;
 }
 
-/**
- * computeRoomArea
- * Direct polygon area via earcut.
- */
-// Flattens points to [x0,y0,x1,y1,...] format
-export function flattenPoints(points: Point2D[]): number[] {
-    return points.reduce<number[]>((acc, point) => {
-        acc.push(point.x, point.y);
-        return acc;
-    }, []);
-}
-
-function computeRoomArea(room: RoomData): number {
-    return calculatePolygonArea(room.points);
-}
-
-// Enhanced unit conversion with dual input modes
-export function calculateRoomAreaInSquareFeet(
-    points: Point2D[], 
-    isInPixels: boolean = true
-): number {
-    const area = calculatePolygonArea(points);
-    
-    if (isInPixels) {
-        return (area / (PIXELS_PER_FOOT * PIXELS_PER_FOOT)) * SQUARE_INCHES_TO_SQUARE_FEET;
-    }
-    return area * SQUARE_INCHES_TO_SQUARE_FEET;
-}
-
-export function squareInchesToSquareFeet(squareInches: number): number {
-    return squareInches * SQUARE_INCHES_TO_SQUARE_FEET;
-}
-
-/**
- * computeTotalAreaForRooms
- * Sums up each top-level room's area, subtracting nested children from the parent.
- * But does not double-subtract for multiple nestings.
- */
-function computeTotalAreaForRooms(allRooms: RoomData[]): number {
-  // Identify nesting by checking if all points of room B are inside room A => B is nested in A
-  const nestingMap: Map<string, string[]> = new Map();
-
-  // Initialize
-  allRooms.forEach(r => nestingMap.set(r.id, []));
-
-  for (let i = 0; i < allRooms.length; i++) {
-    for (let j = 0; j < allRooms.length; j++) {
-      if (i === j) continue;
-      const parent = allRooms[i];
-      const child = allRooms[j];
-
-      // if every point of child is inside parent, child is nested
-      const allInside = child.points.every(p => isPointInPolygon(p, parent.points));
-      if (allInside) {
-        nestingMap.get(parent.id)!.push(child.id);
-      }
-    }
-  }
-
-  // We'll create a function to compute net area for a room,
-  // subtracting out any nested children (recursively).
-  const visited = new Set<string>();
-
-  function getNetArea(roomId: string): number {
-    if (visited.has(roomId)) {
-      return 0;
-    }
-    visited.add(roomId);
-
-    const room = allRooms.find(r => r.id === roomId);
-    if (!room) return 0;
-
-    let area = computeRoomArea(room);
-    const children = nestingMap.get(roomId) || [];
-    children.forEach(childId => {
-      area -= getNetArea(childId);
-    });
-
-    return Math.max(area, 0);
-  }
-
-  let total = 0;
-  // Only sum rooms that are not fully inside another
-  // i.e., top-level rooms
-  for (const r of allRooms) {
-    // check if it is inside any other
-    let isNested = false;
-    for (const candidate of allRooms) {
-      if (candidate.id === r.id) continue;
-      const allInside = r.points.every(p => isPointInPolygon(p, candidate.points));
-      if (allInside) {
-        isNested = true;
-        break;
-      }
-    }
-    if (!isNested) {
-      total += getNetArea(r.id);
-    }
-  }
-
-  return total;
-}
-
-/**
- * calculateAreaAndVolume
- */
-export function calculateAreaAndVolume(
-  walls: WallData[],
-  fixtures: FixtureData[],
-  rooms?: RoomData[]
-): CalcResult {
-  let totalAreaPx = 0;
-  if (rooms && rooms.length > 0) {
-    // Compute properly with nesting
-    totalAreaPx = computeTotalAreaForRooms(rooms);
-  } else {
-    // Fallback: treat walls array as one polygon or 0
-    // This is a very rough fallback
-    if (walls.length < 3) {
-      totalAreaPx = 0;
-    } else {
-      const polygonPoints = walls.map((w) => w.start);
-      totalAreaPx = calculatePolygonArea(polygonPoints);
-    }
-  }
-
-  const totalAreaSqFt = totalAreaPx / (PIXELS_PER_FOOT * PIXELS_PER_FOOT);
-
-  // Average height from walls
-  let avgHeight = 0;
-  if (walls.length > 0) {
-    avgHeight =
-      walls.reduce((acc, w) => acc + (w.height || 96 /* 8ft default */), 0) / walls.length;
-  }
-  const totalVolume = totalAreaSqFt * (avgHeight / PIXELS_PER_FOOT);
-
-  return {
-    totalArea: totalAreaSqFt,
-    totalVolume
-  };
-}
-
-/**
- * isPointInsideWalls
- */
-export function isPointInsideWalls(point: Point2D, walls: WallData[]): boolean {
-  if (walls.length === 0) return false;
-  const points = walls.map((wall) => wall.start);
-  return isPointInPolygon(point, points);
-}
-
-/**
- * getDistance
- * Returns Euclidean distance between two 2D points.
- */
 export function getDistance(p1: Point2D, p2: Point2D): number {
   const dx = p1.x - p2.x;
   const dy = p1.y - p2.y;
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-/**
- * pixelsToFeetAndInches
- */
 export function pixelsToFeetAndInches(pixels: number): string {
   const feet = pixels / PIXELS_PER_FOOT;
   const roundedFeet = Math.floor(feet);
@@ -276,9 +372,10 @@ export function pixelsToFeetAndInches(pixels: number): string {
   return `${roundedFeet}'-${inches}"`;
 }
 
-/**
- * snapToGrid
- */
+export function arePointsEqual(p1: Point2D, p2: Point2D, epsilon = 0.001): boolean {
+  return Math.abs(p1.x - p2.x) < epsilon && Math.abs(p1.y - p2.y) < epsilon;
+}
+
 export function snapToGrid(point: Point2D, gridSize: number): Point2D {
   return {
     x: Math.round(point.x / gridSize) * gridSize,
@@ -286,14 +383,32 @@ export function snapToGrid(point: Point2D, gridSize: number): Point2D {
   };
 }
 
-/**
- * arePointsEqual
- * Checks if two points are extremely close.
- */
-export function arePointsEqual(
-  p1: Point2D,
-  p2: Point2D,
-  epsilon = 0.001
-): boolean {
-  return Math.abs(p1.x - p2.x) < epsilon && Math.abs(p1.y - p2.y) < epsilon;
+export function snapToPoint(point: Point2D, targetPoint: Point2D, snapDistance: number = 10): Point2D {
+  const distance = getDistance(point, targetPoint);
+  if (distance <= snapDistance) {
+    return { ...targetPoint };
+  }
+  return point;
+}
+
+export function snapToWall(point: Point2D, walls: WallData[], snapDistance: number = 10): Point2D {
+  let closestPoint = point;
+  let minDistance = snapDistance;
+
+  walls.forEach(wall => {
+    // Check wall endpoints
+    const distToStart = getDistance(point, wall.start);
+    const distToEnd = getDistance(point, wall.end);
+
+    if (distToStart < minDistance) {
+      minDistance = distToStart;
+      closestPoint = { ...wall.start };
+    }
+    if (distToEnd < minDistance) {
+      minDistance = distToEnd;
+      closestPoint = { ...wall.end };
+    }
+  });
+
+  return closestPoint;
 }

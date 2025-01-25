@@ -2,131 +2,164 @@
 
 import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { toggleSnapToWalls, toggleSnapToFixtures, UiState } from "../../store/slices/uiSlice";
-import type { WallData, RoomData } from "@/types/types";
+import {
+  toggleSnapToWalls,
+  toggleSnapToFixtures,
+  toggleGrid,
+  UiState
+} from "../../store/slices/uiSlice";
+import type { FixtureData, WallData, RoomData } from "@/types/types";
 import { styled } from "@mui/system";
 import { Box, IconButton, Tooltip } from "@mui/material";
-// SVG icon components
-const SelectionIcon = ({ size }: { size: number }) => (
-  <svg 
-    width={size} 
+
+// ========================================================
+// ICONS
+// ========================================================
+
+// Pointer finger (selection)
+const PointerFingerIcon = ({ size }: { size: number }) => (
+  <svg
+    width={size}
     height={size}
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2"
+    viewBox="0 0 512 512"
+    fill="currentColor"
   >
-    <path d="M4 4l7.07 17.97 2.51-7.39 7.39-2.51L4 4zM13.5 13.5l4 4"/>
+    <path d="M256 0C153.755 0 76 77.755 76 180c0 104.86 166.164 318.475 172.99 327.438a20 20 0 0 0 32.02 0C269.836 498.475 436 284.86 436 180 436 77.755 358.245 0 256 0zm0 70c25.405 0 46 20.596 46 46v46h46c25.405 0 46 20.596 46 46 0 5.522-4.477 10-10 10h-20v90c0 5.522-4.477 10-10 10h-20v30c0 5.522-4.477 10-10 10h-20v20c0 5.522-4.477 10-10 10h-20c-5.523 0-10-4.478-10-10v-100c0-5.522-4.477-10-10-10h-30c-5.523 0-10-4.478-10-10V106c0-25.404 20.595-46 46-46z"/>
   </svg>
 );
 
+// Straight line for Draw Wall
 const WallIcon = ({ size }: { size: number }) => (
-  <svg 
-    width={size} 
+  <svg
+    width={size}
     height={size}
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
     strokeWidth="2"
   >
-    <path d="M3 3h18v18H3V3zM3 9h18M3 15h18M9 3v18M15 3v18"/>
+    <path d="M3 12h18M3 12l2 2M3 12l2-2" />
   </svg>
 );
 
+// Rectangle for Draw Room
 const RoomIcon = ({ size }: { size: number }) => (
-  <svg 
-    width={size} 
+  <svg
+    width={size}
     height={size}
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
     strokeWidth="2"
   >
-    <path d="M22 12H2M12 2v20M4 6.5h3M17 6.5h3M4 17.5h3M17 17.5h3M7.5 4v3M7.5 17v3M16.5 4v3M16.5 17v3"/>
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
   </svg>
 );
 
+// Door icon
+const DoorIcon = ({ size }: { size: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <path d="M4 3h16v18H4z" />
+    <path d="M14 3v18" />
+    <circle cx="9" cy="12" r="1" />
+  </svg>
+);
+
+// Window icon
+const WindowIcon = ({ size }: { size: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <path d="M3 12h18M12 3v18" />
+  </svg>
+);
+
+// Undo icon
 const UndoIcon = ({ size }: { size: number }) => (
-  <svg 
-    width={size} 
+  <svg
+    width={size}
     height={size}
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
     strokeWidth="2"
   >
-    <path d="M3 10h10a7 7 0 017 7v0a7 7 0 01-7 7H3M3 10l4-4M3 10l4 4"/>
+    <path d="M3 10h10a7 7 0 017 7v0a7 7 0 01-7 7H3M3 10l4-4M3 10l4 4" />
   </svg>
 );
 
+// Redo icon
 const RedoIcon = ({ size }: { size: number }) => (
-  <svg 
-    width={size} 
+  <svg
+    width={size}
     height={size}
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
     strokeWidth="2"
   >
-    <path d="M21 10H11a7 7 0 00-7 7v0a7 7 0 007 7h10M21 10l-4-4M21 10l-4 4"/>
+    <path d="M21 10H11a7 7 0 00-7 7v0a7 7 0 007 7h10M21 10l-4-4M21 10l-4 4" />
   </svg>
+);
+
+// Eye-like toggle for "Show Grid"
+const ShowGridIcon = ({ size }: { size: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <path d="M3 3h18v18H3V3zM9 3v18M15 3v18M3 9h18M3 15h18" />
+</svg>
 );
 
 // Wall snapping icon
 const WallSnapIcon = ({ size }: { size: number }) => (
-  <svg 
-    width={size} 
+  <svg
+    width={size}
     height={size}
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
     strokeWidth="2"
   >
     <path d="M4 6h16M4 12h16M4 18h16M6 6v12M18 6v12"/>
   </svg>
 );
 
-// Fixture snapping icon  
+// Fixture snapping icon
 const FixtureSnapIcon = ({ size }: { size: number }) => (
-  <svg 
-    width={size} 
+  <svg
+    width={size}
     height={size}
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
     strokeWidth="2"
   >
     <path d="M12 2v20M22 12H2M6 6l12 12M18 6L6 18M19 5l1-1M5 19l-1-1M19 19l1-1M5 5l-1-1"/>
   </svg>
 );
 
-const RulerIcon = ({ size }: { size: number }) => (
-  <svg 
-    width={size} 
-    height={size}
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2"
-  >
-    <path d="M16 2l6 6-14 14-6-6L16 2zM7.5 8.5l2 2M10.5 5.5l2 2M4.5 11.5l2 2M7.5 14.5l2 2"/>
-  </svg>
-);
-
-/**
- * We define a TypeScript interface so that we can pass onToolSelect without triggering
- * the 'IntrinsicAttributes' error. 
- */
-interface MuiToolbarProps {
-  onToolSelect?: (toolId: "select" | "wall" | "room" | "undo" | "redo" | "showMeasurements") => void;
-  showMeasurements?: boolean;
-  angleSnapEnabled?: boolean;
-  showGrid?: boolean;
-}
-
-/**
- * Styled components for the toolbar with stronger glow.
- */
+// ========================================================
+// STYLED COMPONENTS
+// ========================================================
 const OuterWrapper = styled(Box)(() => ({
   position: "relative",
   padding: "18px"
@@ -177,7 +210,7 @@ const ToolbarContainer = styled(Box)(() => ({
   borderRadius: "20px",
   background: "#000000",
   boxShadow:
-    "inset 8px 8px 16px #0a0a0a, inset -8px -8px 16px #1a1a1a, 0 0 6px rgba(255,255,255,0.3)"
+    "inset 8px 8px 16px #0a0a0a, inset -8px -8px 16px #1a1a1a, 0 0 8px rgba(59,130,246,0.7)"
 }));
 
 const ButtonContainer = styled(Box)(() => ({
@@ -198,8 +231,8 @@ const StyledIconButton = styled(IconButton)(() => ({
   zIndex: 2,
   transition: "transform 0.15s, box-shadow 0.15s",
   "&:hover": {
-    transform: "scale(1.07)",
-    boxShadow: "0 0 12px 3px rgba(59,130,246,0.7)"
+    transform: "scale(1.1)",
+    boxShadow: "0 0 12px 3px rgba(59,130,246,0.8)"
   }
 }));
 
@@ -220,36 +253,53 @@ const IconWrapper = styled(Box)<{ active: string }>(({ active }) => ({
   })`
 }));
 
-// Type definition for toolbar items
-type Tool = {
-  id: "select" | "wall" | "room" | "undo" | "redo" | "showMeasurements";
+type Tool =
+  | "select"
+  | "wall"
+  | "room"
+  | "door"
+  | "window"
+  | "undo"
+  | "redo"
+  | "showGrid";
+
+interface ToolbarItem {
+  id: Tool;
   label: string;
   icon: React.ComponentType<{ size: number }>;
-};
+}
+
+interface MuiToolbarProps {
+  onToolSelect?: (toolId: Tool) => void;
+}
 
 export function MuiToolbar({ onToolSelect }: MuiToolbarProps) {
   const dispatch = useDispatch();
-  const { snapToWalls, snapToFixtures } = useSelector((state: { ui: UiState }) => state.ui);
-  const [activeTool, setActiveTool] = useState<Tool['id'] | 'showMeasurements'>("select");
+  const ui = useSelector((state: { ui: UiState }) => state.ui);
+  const { snapToWalls, snapToFixtures, showGrid } = ui;
 
-  const tools: Tool[] = [
-    { id: "select", label: "Selection Tool", icon: SelectionIcon },
+  const [activeTool, setActiveTool] = useState<Tool>("select");
+
+  // Tools in the main list
+  const tools: ToolbarItem[] = [
+    { id: "select", label: "Selection Tool", icon: PointerFingerIcon },
     { id: "wall", label: "Draw Wall", icon: WallIcon },
     { id: "room", label: "Draw Room", icon: RoomIcon },
+    { id: "door", label: "Insert Door", icon: DoorIcon },
+    { id: "window", label: "Insert Window", icon: WindowIcon },
     { id: "undo", label: "Undo", icon: UndoIcon },
-    { id: "redo", label: "Redo", icon: RedoIcon }
+    { id: "redo", label: "Redo", icon: RedoIcon },
+    { id: "showGrid", label: "Show/Hide Grid", icon: ShowGridIcon }
   ];
 
-  const measurementToggle: Tool = {
-    id: "showMeasurements",
-    label: "Show Measurements",
-    icon: RulerIcon
-  };
-
-  const handleToolClick = (toolId: Tool['id'] | 'showMeasurements') => {
+  const handleToolClick = (toolId: Tool) => {
     setActiveTool(toolId);
     if (onToolSelect) {
       onToolSelect(toolId);
+    }
+    // If it's specifically "showGrid", just dispatch toggling the grid
+    if (toolId === "showGrid") {
+      dispatch(toggleGrid());
     }
   };
 
@@ -270,17 +320,7 @@ export function MuiToolbar({ onToolSelect }: MuiToolbarProps) {
             </ButtonContainer>
           ))}
 
-          <ButtonContainer key={measurementToggle.id}>
-            <Tooltip title={measurementToggle.label} arrow placement="right">
-              <StyledIconButton onClick={() => handleToolClick('showMeasurements')}>
-                <IconWrapper active={(activeTool === measurementToggle.id).toString()}>
-                  <measurementToggle.icon size={20} />
-                </IconWrapper>
-              </StyledIconButton>
-            </Tooltip>
-          </ButtonContainer>
-
-          {/* Snapping Controls */}
+          {/* Additional snap toggles at the bottom */}
           <ButtonContainer>
             <Tooltip title="Toggle Wall Snapping" arrow placement="right">
               <StyledIconButton onClick={() => dispatch(toggleSnapToWalls())}>

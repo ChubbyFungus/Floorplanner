@@ -15,3 +15,12 @@ declare module '*.jpg' {
 }
 
 // Add any other custom type declarations here
+
+// Add Vite env type support
+interface ImportMeta {
+  readonly env: {
+    readonly DEV: boolean;
+    readonly PROD: boolean;
+    readonly MODE: 'development' | 'production';
+  };
+}

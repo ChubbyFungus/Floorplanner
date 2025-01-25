@@ -79,10 +79,12 @@ export interface MaterialData {
   id: string;
   name: string;
   color: string;
-  texture?: string;       // For basic textures
-  diffuseMap?: string;    // URL to diffuse texture map
-  normalMap?: string;     // URL to normal texture map
-  opacity?: number;       // For transparent materials
+  texture?: string;
+  diffuseMap?: string;  // URL to diffuse texture map
+  normalMap?: string;   // URL to normal texture map
+  opacity?: number;
+  roughness?: number;   // Added for PBR materials
+  metalness?: number;   // Added for PBR materials
 }
 
 export interface FloorPlannerState {

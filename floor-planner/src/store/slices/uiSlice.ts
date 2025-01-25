@@ -2,6 +2,10 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 export type SelectedTool = "select" | "wall" | "room" | "door" | "window" | null;
 
+interface SetSelectedToolPayload {
+  tool: SelectedTool;
+}
+
 export interface UiState {
   showGrid: boolean;
   snapToGrid: boolean;
@@ -46,8 +50,8 @@ export const uiSlice = createSlice({
     toggleSnapToGrid: (state) => {
       state.snapToGrid = !state.snapToGrid;
     },
-    setSelectedTool: (state, action: PayloadAction<SelectedTool>) => {
-      state.selectedTool = action.payload;
+    setSelectedTool: (state, action: PayloadAction<SetSelectedToolPayload>) => {
+      state.selectedTool = action.payload.tool;
     },
     setErrorMessage: (state, action: PayloadAction<string | null>) => {
       state.errorMessage = action.payload;
@@ -78,7 +82,10 @@ export const uiSlice = createSlice({
     },
     toggleSnapToFixtures: (state) => {
       state.snapToFixtures = !state.snapToFixtures;
-    }
+    },
+    setSnapGridSize: (state, action: PayloadAction<number>) => {
+      state.snapGridSize = action.payload;
+    },
   }
 });
 
@@ -95,7 +102,8 @@ export const {
   toggleTapeMeasure,
   toggleAiTips,
   toggleSnapToWalls,
-  toggleSnapToFixtures
+  toggleSnapToFixtures,
+  setSnapGridSize
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

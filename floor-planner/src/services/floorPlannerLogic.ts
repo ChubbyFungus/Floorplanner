@@ -1,25 +1,30 @@
 import { WallData } from "../types";
 import { arePointsEqual } from "../utils/geometryUtils";
+import { debugLogger } from "../utils/debugLogger";
 
 /**
- * finalizeWallCreation
- * Centralizes logic for adding a newly finished wall to the array of existing walls.
- * Includes a duplicate check to avoid adding walls with the same start/end.
+ * Checks if a wall would be a duplicate of any existing walls
  */
-export function finalizeWallCreation(
-  wallInProgress: WallData,
-  walls: WallData[]
-): void {
-  const { start, end } = wallInProgress;
-
-  // Check if there's already a wall with the same start/end (or reversed).
-  const duplicateWall = walls.find(
-    (w) =>
+export function isDuplicateWall(wall: WallData, existingWalls: WallData[]): boolean {
+  const { start, end } = wall;
+  return existingWalls.some(
+    (w: WallData) =>
       (arePointsEqual(w.start, start) && arePointsEqual(w.end, end)) ||
       (arePointsEqual(w.start, end) && arePointsEqual(w.end, start))
   );
+}
 
-  if (!duplicateWall) {
-    walls.push(wallInProgress);
+/**
+ * Validates a wall before adding it to the state
+ */
+export function validateWall(wall: WallData, existingWalls: WallData[]): boolean {
+  debugLogger("Validating wall", { wall, existingWalls });
+  
+  // Check for duplicates
+  if (isDuplicateWall(wall, existingWalls)) {
+    debugLogger("Duplicate wall detected, skipping", { wall });
+    return false;
   }
+
+  return true;
 }

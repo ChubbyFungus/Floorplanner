@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from "uuid";
  * If not in production, just console.log instead of calling /api/debug-logger.
  */
 export async function debugLogger(message: string, data?: any) {
-  if (process.env.NODE_ENV !== "production") {
+  if (import.meta.env.DEV) {
     console.log("[debugLogger - dev]", message, data);
     return;
   }

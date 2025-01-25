@@ -1,50 +1,28 @@
-// src/setupTests.ts
+import { vi } from 'vitest';
+import type { WebGLRenderer } from 'three';
+
+// Mock ResizeObserver
+class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+(window as any).ResizeObserver = ResizeObserver;
+
 /**
- * We stub out getContext("2d") and getContext("webgl") so that libraries
- * like Lottie or React Three Fiber won't crash on "not implemented" errors.
- * This is a minimal, fake canvas context approach that stops the test from failing.
+ * Remove vi.mock('three') so we don't create a second instance 
+ * of ThreeJS in the tests. Now we rely on the real 'three' 
+ * library for test environment or partial mocks if needed.
  */
 
-if (typeof HTMLCanvasElement !== 'undefined') {
-  const originalGetContext = HTMLCanvasElement.prototype.getContext;
+// If you need a partial override, do something like:
+// vi.mock('three', async (importOriginal) => {
+//   const original = await importOriginal<typeof import('three')>();
+//   // PARTIAL override or no override at all
+//   return { ...original };
+// });
 
-  HTMLCanvasElement.prototype.getContext = function (
-    type: string,
-    ...args: any[]
-  ) {
-    // If requesting "2d", return a minimal mock object
-    if (type === '2d') {
-      return {
-        fillStyle: '#000',
-        strokeStyle: '#000',
-        lineWidth: 1,
-        fillRect: () => {},
-        strokeRect: () => {},
-        beginPath: () => {},
-        moveTo: () => {},
-        lineTo: () => {},
-        arc: () => {},
-        closePath: () => {},
-        fill: () => {},
-        stroke: () => {},
-        measureText: () => ({ width: 0 }),
-        // ... add stubs for any other methods Lottie might call
-      };
-    }
-
-    // If requesting "webgl" or "webgl2", return a minimal mock
-    if (type === 'webgl' || type === 'webgl2') {
-      return {
-        // minimal mock for Three.js
-        getExtension: () => null,
-        activeTexture: () => {},
-        bindTexture: () => {},
-        texImage2D: () => {},
-        // ... more stubs if needed
-      };
-    }
-
-    // fallback for other context types (like "2d", "bitmaprenderer", etc.)
-    return originalGetContext.apply(this, [type, ...args]);
-  };
-}
+// Setup canvas
+const canvas = document.createElement('canvas');
+canvas.id = 'three-canvas';
+document.body.appendChild(canvas);

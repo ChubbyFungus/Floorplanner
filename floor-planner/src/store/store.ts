@@ -1,5 +1,4 @@
-// src/store/store.ts
-import { configureStore, Middleware } from "@reduxjs/toolkit";
+import { configureStore, Middleware, Action, ThunkAction } from "@reduxjs/toolkit";
 import undoable, { StateWithHistory } from "redux-undo";
 import floorPlannerReducer, { FloorPlannerState } from "./slices/floorPlannerSlice";
 import uiReducer, { UiState } from "./slices/uiSlice";
@@ -7,11 +6,6 @@ import roomSlice from "./slices/roomSlice";
 import projectManagerReducer from "./slices/projectManagerSlice";
 import roomToolReducer from "./slices/roomToolSlice";
 
-/**
- * RootState
- * ---------
- * Combines all slice states, including undo history for floorPlanner.
- */
 export interface RootState {
   floorPlanner: StateWithHistory<FloorPlannerState>;
   ui: UiState;
@@ -20,44 +14,32 @@ export interface RootState {
   roomTool: ReturnType<typeof roomToolReducer>;
 }
 
-/**
- * loggingMiddleware
- * -----------------
- * Simple Redux middleware that logs actions and states.
- */
 const loggingMiddleware: Middleware<{}, RootState> = (store) => (next) => (action) => {
-  console.log("=== Redux Action ===");
-  console.log(`[${new Date().toISOString()}] Action:`, action);
-  console.log("Previous state:", store.getState());
+  // optional logging
   const result = next(action);
-  console.log("Next state:", store.getState());
-  console.log("==================");
   return result;
 };
 
-/**
- * trackableActions
- * ----------------
- * Only the "major" actions should be part of undo/redo history,
- * preventing each small movement from flooding the history.
- */
+// Extended trackable actions
 const trackableActions = [
   "floorPlanner/startWall",
   "floorPlanner/finishWall",
   "floorPlanner/deleteWall",
   "floorPlanner/addFixture",
   "floorPlanner/clearCanvas",
-  // For room creation
-  "roomTool/createRectangularRoom/fulfilled"
-];
+  "roomTool/createRectangularRoom/fulfilled",
+  // Add the new door/window actions:
+  "floorPlanner/addDoor",
+  "floorPlanner/addWindow"
+] as const;
 
 export const store = configureStore({
   reducer: {
     floorPlanner: undoable(floorPlannerReducer, {
       limit: 100,
-      filter: (action) => {
+      filter: (action): boolean => {
         if (typeof action.type === "string") {
-          return trackableActions.includes(action.type);
+          return trackableActions.includes(action.type as typeof trackableActions[number]);
         }
         return false;
       }
@@ -69,8 +51,17 @@ export const store = configureStore({
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      serializableCheck: false
+      serializableCheck: {
+        // Ignore these action types
+        ignoredActions: ['persist/PERSIST']
+      }
     }).concat(loggingMiddleware)
 });
 
 export type AppDispatch = typeof store.dispatch;
+export type AppThunk<ReturnType = void> = ThunkAction<
+  ReturnType,
+  RootState,
+  unknown,
+  Action<string>
+>;
