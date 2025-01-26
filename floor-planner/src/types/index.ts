@@ -23,18 +23,6 @@ export interface BaseWallData {
   controlPoints?: Point2D[];
 }
 
-export interface CurvedWallData {
-  id: string;
-  type: "curved";
-  start: Point2D;
-  end: Point2D;
-  controlPoints?: Point2D[];
-  thickness: number;
-  height: number;
-  radius?: number;     
-  segments?: number;   
-}
-
 export interface StraightWallData extends BaseWallData {
   type: 'straight';
 }
@@ -42,6 +30,8 @@ export interface StraightWallData extends BaseWallData {
 export interface CurvedWallData extends BaseWallData {
   type: 'curved';
   controlPoint: Point2D;
+  radius?: number;
+  segments?: number;
 }
 
 export interface ArcWallData extends BaseWallData {
@@ -80,11 +70,11 @@ export interface MaterialData {
   name: string;
   color: string;
   texture?: string;
-  diffuseMap?: string;  // URL to diffuse texture map
-  normalMap?: string;   // URL to normal texture map
+  diffuseMap?: string;
+  normalMap?: string;
   opacity?: number;
-  roughness?: number;   // Added for PBR materials
-  metalness?: number;   // Added for PBR materials
+  roughness?: number;
+  metalness?: number;
 }
 
 export interface FloorPlannerState {

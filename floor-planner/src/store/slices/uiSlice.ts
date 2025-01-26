@@ -1,9 +1,10 @@
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, PayloadAction, Slice } from "@reduxjs/toolkit";
 
-export type SelectedTool = "select" | "wall" | "room" | "door" | "window" | null;
+export type ToolType = "select" | "wall" | "room" | "door" | "window";
+export type SelectedTool = ToolType | null;
 
 interface SetSelectedToolPayload {
-  tool: SelectedTool;
+  tool: ToolType | null;
 }
 
 export interface UiState {
@@ -40,7 +41,7 @@ const initialState: UiState = {
   aiTipsOpen: false
 };
 
-export const uiSlice = createSlice({
+export const uiSlice: Slice<UiState> = createSlice({
   name: "ui",
   initialState,
   reducers: {
@@ -85,7 +86,7 @@ export const uiSlice = createSlice({
     },
     setSnapGridSize: (state, action: PayloadAction<number>) => {
       state.snapGridSize = action.payload;
-    },
+    }
   }
 });
 

@@ -1,4 +1,4 @@
-import { Point2D } from "./index";
+import { Point2D, FixtureData } from "./index";
 
 export interface StraightWallData {
   id: string;
@@ -38,15 +38,6 @@ export interface RoomData {
   // Mark these optional if they're not always computed:
   perimeter?: number;
   height?: number;
-}
-
-export interface FixtureData {
-  id: string;
-  name: string;
-  position: Point2D;
-  width: number;
-  depth: number;
-  height: number;
 }
 
 export interface MaterialData {

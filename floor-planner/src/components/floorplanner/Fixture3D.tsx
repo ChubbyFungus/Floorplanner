@@ -10,8 +10,7 @@ interface Fixture3DProps {
 
 export const Fixture3D: React.FC<Fixture3DProps> = ({ fixture }) => {
   const meshRef = useRef<Mesh>(null);
-  // Assert materialId as string | undefined to match the type in FixtureData
-  const material = useMaterial(fixture.materialId as string | undefined);
+  const material = useMaterial(fixture.materialId);
 
   // Debug logging
   console.log('Fixture object:', {

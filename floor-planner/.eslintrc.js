@@ -38,9 +38,12 @@ module.exports = {
         "warn",
         {
           "groups": ["builtin", "external", "internal", "parent", "sibling", "index"],
-          "alphabetical": false
+          "newlines-between": "always",
+          "alphabetize": {
+            "order": "asc",
+            "caseInsensitive": true
+          }
         }
       ]
     }
   };
-  
